@@ -40,6 +40,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-firebase.ts
 ongeki-database-c59da7980822.json
 test.txt
