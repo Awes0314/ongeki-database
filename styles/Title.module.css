@@ -1,0 +1,22 @@
+.title {
+  color: #293241;
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 1.5rem 0 1rem 0;
+  text-align: center;
+  letter-spacing: 0.05em;
+  background: linear-gradient(
+    105deg,
+    rgba(238, 108, 77, 0.15) 0%,
+    rgba(238, 108, 77, 0.15) 20%,
+    rgba(61, 90, 128, 0.15) 30%,
+    rgba(61, 90, 128, 0.15) 100%
+  );
+  border-radius: var(--radius);
+  padding: 0.5em 1.2em;
+}
+@media (max-width: 480px) {
+  .title {
+    margin-top: 0.2rem;
+  }
+}

@@ -1,0 +1,87 @@
+.card {
+  display: block;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(61, 90, 128, 0.08);
+  border: none;
+  border-left: 8px solid #ee6c4d;
+  padding: 0;
+  margin: 0.5rem 0;
+  transition: box-shadow 0.2s, border 0.2s, transform 0.1s;
+  color: var(--main-dark);
+  text-decoration: none;
+}
+
+.card:hover, .card:focus {
+  box-shadow: 0 4px 16px rgba(61, 90, 128, 0.18);
+  border-left: 8px solid #ee6c4d;
+  transform: translateY(-2px) scale(1.01);
+}
+
+.cardInner {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  height: 100%;
+  width: 100%;
+}
+
+.cardText {
+  flex: 0 0 70%;
+  padding: 1.2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.cardImageWrapper {
+  flex: 0 0 30%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 0.7rem 0.7rem 0.2rem;
+}
+
+.cardImage {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #eee;
+  display: block;
+  max-width: 100px;
+  max-height: 100px;
+}
+
+.cardHeader h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--main-blue);
+}
+
+.cardDesc {
+  color: var(--main-dark);
+  font-size: 1rem;
+}
+
+.cardPreview {
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .cardText {
+    padding: 1rem 1.2rem 1.2rem 1.4rem;
+  }
+  .cardDesc {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+  .cardImageWrapper {
+    padding: 0.3rem 0.5rem 0.3rem 0.1rem;
+  }
+  .cardImage {
+    max-width: 80px;
+    max-height: 80px;
+  }
+}

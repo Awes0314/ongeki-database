@@ -1,0 +1,194 @@
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: none;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  height: 48px;
+  padding: 0 1rem;
+  box-shadow: none;
+  margin-top: 0.5rem
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  margin-right: 1.2rem;
+  transition: background 0.2s;
+  border-radius: 50%;
+  padding: 0;
+}
+.logo a {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+.logoP {
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 1.7rem;
+  color: #3d5a80;
+  background: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  user-select: none;
+}
+.logoScrolled .logoP {
+  background: linear-gradient(
+    135deg,
+    rgba(238, 108, 77, 1) 0%,
+    rgba(238, 108, 77, 1) 10%,
+    rgba(61, 90, 128, 1) 20%,
+    rgba(61, 90, 128, 1) 100%
+  );
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(61, 90, 128, 0.10);
+  border-radius: 3px;
+}
+
+.menuBtn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  z-index: 202;
+  width: 44px;
+  height: 44px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.4s;
+}
+.menuBtnScrolled,
+.menuBtnOpen {
+  background: linear-gradient(
+    135deg,
+    rgba(238, 108, 77, 1) 0%,
+    rgba(238, 108, 77, 1) 10%,
+    rgba(61, 90, 128, 1) 20%,
+    rgba(61, 90, 128, 1) 100%
+  );
+  border-radius: 3px;
+}
+.menuIcon {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 28px;
+  height: 28px;
+  gap: 5px;
+  position: relative;
+  transition: 0.3s;
+}
+.menuIcon span {
+  display: block;
+  width: 28px;
+  height: 3px;
+  background: #3d5a80;
+  border-radius: 2px;
+  transition: 0.3s cubic-bezier(.4,0,.2,1);
+  position: absolute;
+  left: 0;
+}
+.menuIcon span:nth-child(1) {
+  top: 5px;
+}
+.menuIcon span:nth-child(2) {
+  top: 12.5px;
+}
+.menuIcon span:nth-child(3) {
+  top: 20px;
+}
+.menuIconScrolled span {
+  background: #fff;
+}
+.menuIconOpen span {
+  background: #fff;
+}
+.menuIconOpen span:nth-child(1) {
+  transform: translateY(7.5px) rotate(45deg);
+}
+.menuIconOpen span:nth-child(2) {
+  opacity: 0;
+}
+.menuIconOpen span:nth-child(3) {
+  transform: translateY(-7.5px) rotate(-45deg);
+}
+
+.spMenu {
+  position: fixed;
+  top: 62px;
+  right: 0;
+  height: calc(100vh - 48px);
+  background: rgba(61, 90, 128, 0.9);
+  box-shadow: -2px 0 12px rgba(61, 90, 128, 0.10);
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  opacity: 0;
+  width: 60vw;
+  max-width: 320px;
+}
+.spMenuVisible {
+  pointer-events: auto;
+}
+.spMenuOpen {
+  transform: translateX(0);
+  opacity: 1;
+}
+@media (min-width: 481px) {
+  .spMenu {
+    width: 30vw;
+    max-width: 400px;
+  }
+}
+.spMenuNav {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+  padding: 2.2rem 2.2rem 0 2.2rem; /* 上右下左:左右余白統一 */
+}
+.spMenuLink {
+  color: #fff;
+  font-size: 1.2rem;
+  text-decoration: none;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  transition: color 0.2s;
+}
+.spMenuLink:hover {
+  color: var(--accent-orange);
+}
+@media (max-width: 480px) {
+  .header {
+    padding: 0.7rem;
+    margin-top: 0.5rem;
+  }
+  .logoP {
+    width: 44px;
+    height: 44px;
+    font-size: 1.7rem;
+  }
+  .menuBtn {
+    width: 44px;
+    height: 44px;
+  }
+  .spMenu {
+    top: 62px;
+  }
+}
