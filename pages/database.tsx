@@ -103,34 +103,24 @@ export default function Database() {
     }
     setLoading(true);
     try {
-      // chartsコレクション取得
-      const res = await fetch(
-        "https://firestore.googleapis.com/v1/projects/ongeki-database/databases/(default)/documents/charts?pageSize=1000"
-      );
+      // data.json取得
+      const res = await fetch("/data/data.json");
       const json = await res.json();
-      if (!json.documents) {
+      if (!Array.isArray(json)) {
         setErrorMsg("データ取得に失敗しました");
         setLoading(false);
         return;
       }
-      // fields存在チェック・整形
-      const docs = json.documents
-        .map((doc: any) => doc.fields)
-        .filter((fields: any) => fields && fields.level && typeof fields.level.stringValue === "string");
-
       // レベルフィルタ
-      let filtered = docs.filter((fields: any) =>
-        selectedLevels.includes(fields.level.stringValue)
+      let filtered = json.filter((item: any) =>
+        item.level && selectedLevels.includes(item.level)
       );
-
       // テクチャレ除外
       if (techExclude === "yes") {
         filtered = filtered.filter(
-          (fields: any) =>
-            !fields.techFlag || fields.techFlag.booleanValue !== true
+          (item: any) => !item.techFlag
         );
       }
-
       // ソートキー定義
       const sortKeys =
         sort === "star"
@@ -154,12 +144,11 @@ export default function Database() {
               "ps5RainbowCount",
               "ts1TheoryCount",
             ];
-
       // ソート関数
       filtered.sort((a: any, b: any) => {
         for (const key of sortKeys) {
-          const va = a[key]?.integerValue ?? a[key]?.doubleValue ?? 0;
-          const vb = b[key]?.integerValue ?? b[key]?.doubleValue ?? 0;
+          const va = Number(a[key] ?? 0);
+          const vb = Number(b[key] ?? 0);
           if (va !== vb) {
             return order === "desc" ? vb - va : va - vb;
           }
@@ -167,50 +156,48 @@ export default function Database() {
         return 0;
       });
 
+      // オプション文字列
+      const optionStr = [
+        `レベル: ${selectedLevels.join(",")}`,
+        `ソート: ${sort === "star" ? "☆5獲得人数" : "譜面定数"}${order === "desc" ? "降順" : "昇順"}`,
+        `テクチャレ除外: ${techExclude === "yes" ? "する" : "しない"}`
+      ].join(" / ");
+
       // 表示用データ整形
       const tableData = [
         [
           "楽曲名",
           "難易度",
           "レベル",
-          "☆5(虹)",
-          "☆5",
-          "☆4",
-          "☆3",
-          "☆2",
-          "☆1",
-          "☆5合計",
           "譜面定数",
-          "TS1位理論値回数",
+          "☆5人数",
         ],
-        ...filtered.map((fields: any) => [
-          fields.musicName?.stringValue ?? "",
-          fields.difficulty?.stringValue ?? "",
-          fields.level?.stringValue ?? "",
-          fields.ps5RainbowCount?.integerValue ?? "",
-          fields.ps5Count?.integerValue ?? "",
-          fields.ps4Count?.integerValue ?? "",
-          fields.ps3Count?.integerValue ?? "",
-          fields.ps2Count?.integerValue ?? "",
-          fields.ps1Count?.integerValue ?? "",
-          fields.ps5TotalCount?.integerValue ?? "",
-          fields.chartConst?.doubleValue ?? "",
-          fields.ts1TheoryCount?.integerValue ?? "",
+        ...filtered.map((item: any) => [
+          item.musicName ?? "",
+          item.difficulty ?? "",
+          item.level ?? "",
+          item.chartConst ?? "",
+          item.ps5TotalCount ?? "",
+          // 右側帯グラフ用データは後で参照
         ]),
       ];
 
-      // canvas描画
-      const cellW = 120;
-      const cellH = 32;
-      const maxCol = tableData[0].length;
-      const maxRow = tableData.length;
-      const canvasW = Math.min(cellW * maxCol, 1200);
-      const canvasH = Math.min(cellH * maxRow, 8000);
+      // レイアウト定義
+      const rowH = 28;
+      const headerH = 120;
+      const leftMargin = 18;
+      const rightMargin = 18;
+      // カラム幅割合: 6:2:2:1:6
+      const colRatio = [6, 2, 2, 1, 6];
+      const totalRatio = colRatio.reduce((a, b) => a + b, 0);
+      const tableW = 900;
+      const colW = colRatio.map(r => Math.round((tableW - leftMargin - rightMargin) * r / totalRatio));
+      const canvasW = tableW;
+      const canvasH = headerH + rowH * filtered.length + 60;
 
       const canvas = document.createElement("canvas");
       canvas.width = canvasW;
-      canvas.height = Math.min(canvasH, window.innerHeight * 0.9);
-
+      canvas.height = canvasH;
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("canvas error");
 
@@ -218,32 +205,237 @@ export default function Database() {
       ctx.fillStyle = "#e0fbfc";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      ctx.font = "bold 15px 'Segoe UI',sans-serif";
-      ctx.textBaseline = "middle";
-      ctx.textAlign = "center";
+      // 上端ボーダー
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(canvasW, 0);
+      ctx.lineWidth = 12;
+      ctx.strokeStyle = "#ee6c4d";
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.floor(canvasW * 0.3), 0);
+      ctx.stroke();
+      ctx.strokeStyle = "#3d5a80";
+      ctx.moveTo(Math.floor(canvasW * 0.3), 0);
+      ctx.lineTo(canvasW, 0);
+      ctx.stroke();
+      ctx.restore();
 
-      for (let r = 0; r < maxRow; ++r) {
-        for (let c = 0; c < maxCol; ++c) {
-          const x = c * cellW;
-          const y = r * cellH;
-          // ヘッダー色
-          ctx.fillStyle = r === 0 ? "#3d5a80" : "#fff";
-          ctx.fillRect(x, y, cellW, cellH);
-          ctx.strokeStyle = "#98c1d9";
-          ctx.strokeRect(x, y, cellW, cellH);
-          ctx.fillStyle = r === 0 ? "#fff" : "#293241";
-          ctx.fillText(
-            String(tableData[r][c]),
-            x + cellW / 2,
-            y + cellH / 2,
-            cellW - 8
-          );
+      // 下端ボーダー
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(0, canvasH - 1);
+      ctx.lineTo(canvasW, canvasH - 1);
+      ctx.lineWidth = 12;
+      ctx.strokeStyle = "#ee6c4d";
+      ctx.moveTo(0, canvasH - 1);
+      ctx.lineTo(Math.floor(canvasW * 0.3), canvasH - 1);
+      ctx.stroke();
+      ctx.strokeStyle = "#3d5a80";
+      ctx.moveTo(Math.floor(canvasW * 0.3), canvasH - 1);
+      ctx.lineTo(canvasW, canvasH - 1);
+      ctx.stroke();
+      ctx.restore();
+
+      // タイトル・オプションエリア（オプションは上部右詰め）
+      ctx.font = "bold 28px 'Segoe UI',sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#3d5a80";
+      ctx.fillText("☆獲得人数一覧", leftMargin + (tableW - leftMargin - rightMargin) / 2, headerH / 2);
+
+      // オプション表示（上部右詰め、表の右側ではなく上部に）
+      ctx.save();
+      ctx.font = "15px 'Segoe UI',sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#293241";
+      const optX = canvasW - 24;
+      let optY = 26;
+      ctx.fillText("Generated Datetime: " + new Date().toLocaleString("ja-JP", { hour12: false }), optX, optY);
+      ctx.fillText("Level: " + selectedLevels.join(", "), optX, optY + 24);
+      ctx.fillText("Sort: " + (sort === "star" ? "☆5獲得人数" : "譜面定数") + " " + (order === "desc" ? "降順" : "昇順"), optX, optY + 48);
+      ctx.fillText("Technical Challenge: " + (techExclude === "yes" ? "除外する" : "除外しない"), optX, optY + 72);
+      ctx.restore();
+
+      // テーブルヘッダー
+      const headers = ["Title", "Diff", "Lev(Const)", "☆5Count", "☆5Distr"];
+      let x = leftMargin;
+      ctx.font = "bold 16px 'Segoe UI',sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (let c = 0; c < headers.length; ++c) {
+        ctx.fillStyle = "#3d5a80";
+        ctx.fillRect(x, headerH, colW[c], rowH);
+        ctx.strokeStyle = "#98c1d9";
+        ctx.strokeRect(x, headerH, colW[c], rowH);
+        ctx.fillStyle = "#fff";
+        ctx.fillText(headers[c], x + colW[c] / 2, headerH + rowH / 2, colW[c] - 8);
+        x += colW[c];
+      }
+
+      // テーブル本体
+      for (let r = 0; r < filtered.length; ++r) {
+        let x = leftMargin;
+        const item = filtered[r];
+        // Title背景色
+        let bgColor = "#fff";
+        switch (item.difficulty) {
+          case "MASTER": bgColor = "#f3e6fa"; break;
+          case "EXPERT": bgColor = "#fde6f3"; break;
+          case "ADVANCED": bgColor = "#fff2e0"; break;
+          case "BASIC": bgColor = "#e6fae6"; break;
+          case "LUNATIC": bgColor = "#f3f3f3"; break;
         }
+        // Title
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(x, headerH + rowH * (r + 1), colW[0], rowH);
+        ctx.strokeStyle = "#98c1d9";
+        ctx.strokeRect(x, headerH + rowH * (r + 1), colW[0], rowH);
+        ctx.fillStyle = "#293241";
+        ctx.textAlign = "left";
+        ctx.font = "bold 15px 'Segoe UI',sans-serif";
+        ctx.fillText(item.musicName ?? "", x + 12, headerH + rowH * (r + 1) + rowH / 2, colW[0] - 24);
+        x += colW[0];
+
+        // Diff
+        let diffColor = "#293241";
+        switch (item.difficulty) {
+          case "MASTER": diffColor = "#a259e6"; break;
+          case "EXPERT": diffColor = "#e0408a"; break;
+          case "ADVANCED": diffColor = "#ff9800"; break;
+          case "BASIC": diffColor = "#7ed957"; break;
+          case "LUNATIC": diffColor = "#222"; break;
+        }
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(x, headerH + rowH * (r + 1), colW[1], rowH);
+        ctx.strokeStyle = "#98c1d9";
+        ctx.strokeRect(x, headerH + rowH * (r + 1), colW[1], rowH);
+        ctx.fillStyle = diffColor;
+        ctx.textAlign = "center";
+        ctx.font = "bold 15px 'Segoe UI',sans-serif";
+        ctx.fillText(item.difficulty ?? "", x + colW[1] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[1] - 8);
+        x += colW[1];
+
+        // Lev(Const)
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(x, headerH + rowH * (r + 1), colW[2], rowH);
+        ctx.strokeStyle = "#98c1d9";
+        ctx.strokeRect(x, headerH + rowH * (r + 1), colW[2], rowH);
+        ctx.fillStyle = "#293241";
+        ctx.textAlign = "center";
+        ctx.font = "15px 'Segoe UI',sans-serif";
+        let chartConstDisp = "";
+        if (item.chartConst !== undefined && item.chartConst !== null && item.chartConst !== "") {
+          let num = Number(item.chartConst);
+          chartConstDisp = isNaN(num) ? String(item.chartConst) : num.toFixed(1);
+        }
+        ctx.fillText(
+          `${item.level ?? ""}${chartConstDisp ? ` (${chartConstDisp})` : ""}`,
+          x + colW[2] / 2,
+          headerH + rowH * (r + 1) + rowH / 2,
+          colW[2] - 8
+        );
+        x += colW[2];
+
+        // ☆5Count
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(x, headerH + rowH * (r + 1), colW[3], rowH);
+        ctx.strokeStyle = "#98c1d9";
+        ctx.strokeRect(x, headerH + rowH * (r + 1), colW[3], rowH);
+        ctx.fillStyle = (item.ps5TotalCount == "100" ? "#ee6c4d" : "#293241");
+        ctx.textAlign = "center";
+        ctx.font = "bold 15px 'Segoe UI',sans-serif";
+        ctx.fillText(item.ps5TotalCount ?? "", x + colW[3] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[3] - 8);
+        x += colW[3];
+
+        // ☆5Distr（帯グラフ）
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x, headerH + rowH * (r + 1), colW[4], rowH);
+        ctx.clip();
+
+        // データ取得
+        const rainbow = Number(item.ps5RainbowCount ?? 0);
+        const star5 = Number(item.ps5Count ?? 0);
+        const star4 = Number(item.ps4Count ?? 0);
+        const star3 = Number(item.ps3Count ?? 0);
+        const star2 = Number(item.ps2Count ?? 0);
+        const star1 = Number(item.ps1Count ?? 0);
+        let remain = 100;
+        const segs = [
+          { n: rainbow, type: "rainbow" },
+          { n: star5, type: "red" },
+          { n: star4, type: "orange" },
+          { n: star3, type: "yellow" },
+          { n: star2, type: "green" },
+          { n: star1, type: "blue" },
+        ].map((v) => {
+          const use = Math.max(0, Math.min(remain, v.n));
+          remain -= use;
+          return { ...v, n: use };
+        });
+        if (remain > 0) segs.push({ n: remain, type: "gray" });
+
+        // 各セグメント描画
+        let segX = x;
+        const segW = colW[4] / 100;
+        for (const seg of segs) {
+          if (seg.n <= 0) continue;
+          if (seg.type === "rainbow") {
+            for (let i = 0; i < seg.n; ++i) {
+              const grad = ctx.createLinearGradient(
+                segX + i * segW, headerH + rowH * (r + 1),
+                segX + (i + 1) * segW, headerH + rowH * (r + 2)
+              );
+              grad.addColorStop(0, "#ff0000");
+              grad.addColorStop(0.2, "#ffa500");
+              grad.addColorStop(0.4, "#ffff00");
+              grad.addColorStop(0.6, "#00ff00");
+              grad.addColorStop(0.8, "#00bfff");
+              grad.addColorStop(1, "#800080");
+              ctx.fillStyle = grad;
+              ctx.fillRect(segX + i * segW, headerH + rowH * (r + 1), segW, rowH);
+            }
+            segX += seg.n * segW;
+            continue;
+          }
+          if (seg.type === "red") ctx.fillStyle = "#ff0000";
+          else if (seg.type === "orange") ctx.fillStyle = "#ffa500";
+          else if (seg.type === "yellow") ctx.fillStyle = "#ffff00";
+          else if (seg.type === "green") ctx.fillStyle = "#00ff00";
+          else if (seg.type === "blue") ctx.fillStyle = "#00bfff";
+          else ctx.fillStyle = "#c0c0c0";
+          ctx.fillRect(segX, headerH + rowH * (r + 1), seg.n * segW, rowH);
+          segX += seg.n * segW;
+        }
+        ctx.restore();
+        ctx.strokeStyle = "#98c1d9";
+        ctx.strokeRect(x, headerH + rowH * (r + 1), colW[4], rowH);
+      }
+
+      // ログ送信 try catch
+      try {
+        await fetch("/api/insertLog", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "オプションを適用",
+            option: optionStr,
+            levels: selectedLevels,
+            sort,
+            order,
+            techExclude,
+            userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+            timestamp: new Date().toISOString(),
+          }),
+        })
+        } catch (logError) {
+          console.error("ログ送信に失敗:", logError);
       }
 
       setTableImageUrl(canvas.toDataURL());
     } catch (e: any) {
-      setErrorMsg("データ取得・描画に失敗しました");
+      setErrorMsg("データ取得・描画に失敗しま した");
     }
     setLoading(false);
   };

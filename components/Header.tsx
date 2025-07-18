@@ -16,6 +16,7 @@ const Header: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null); // ボタン用ref
   const router = useRouter();
 
   // スクロール時ロゴ背景
@@ -26,17 +27,22 @@ const Header: React.FC = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // メニュー外クリックで閉じる
+  // メニュー外クリックで閉じる（buttonも除外）
   useEffect(() => {
     if (!open) return;
+
     const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node;
       if (
         menuRef.current &&
-        !menuRef.current.contains(e.target as Node)
+        !menuRef.current.contains(target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(target)
       ) {
-        setOpen(false);
+        setOpen(false); // アニメーション付きで閉じる
       }
     };
+
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
@@ -48,8 +54,7 @@ const Header: React.FC = () => {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
-      // メニューを閉じる時はアニメーション後に非表示
-      const timer = setTimeout(() => setMenuVisible(false), 300);
+      const timer = setTimeout(() => setMenuVisible(false), 300); // アニメーション後に非表示
       return () => clearTimeout(timer);
     }
   }, [open]);
@@ -57,20 +62,19 @@ const Header: React.FC = () => {
   // ルートが"/"ならハンバーガー非表示
   const isTop = router.pathname === "/";
 
-  // メニュー遷移時に閉じる
+  // ページ遷移時にメニューを閉じる
   useEffect(() => {
     setOpen(false);
   }, [router.pathname]);
 
-  // ハンバーガーボタン押下時の処理
+  // ハンバーガーボタン押下時
   const handleMenuBtnClick = () => {
     if (open) {
-      // 閉じる: open=false（アニメーション後にmenuVisible=false）
+      // アニメーション付きで閉じる
       setOpen(false);
     } else {
-      // 開く: menuVisible=true→open=true
       setMenuVisible(true);
-      setTimeout(() => setOpen(true), 10); // 少し遅延してopen
+      setTimeout(() => setOpen(true), 10); // 少し遅延させて開く
     }
   };
 
@@ -85,6 +89,7 @@ const Header: React.FC = () => {
       {!isTop && (
         <>
           <button
+            ref={buttonRef}
             className={`${styles.menuBtn} ${scrolled ? styles.menuBtnScrolled : ""} ${open ? styles.menuBtnOpen : ""}`}
             aria-label={open ? "メニューを閉じる" : "メニューを開く"}
             aria-expanded={open}
@@ -123,4 +128,3 @@ const Header: React.FC = () => {
 };
 
 export default Header;
-

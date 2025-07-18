@@ -8,6 +8,7 @@ type Props = {
   description: string;
   imageSrc?: string;
   preview?: React.ReactNode;
+  onClick?: () => void;
 };
 
 const Card: React.FC<Props> = ({ href, title, description, imageSrc, preview }) => (

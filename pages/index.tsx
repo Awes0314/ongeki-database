@@ -4,6 +4,7 @@ import Title from "@/components/Title";
 import Card from "@/components/Card";
 import styles from "@/styles/Home.module.css";
 import Link from "next/link";
+import { useEffect } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,6 +17,32 @@ const geistMono = Geist_Mono({
 });
 
 export default function Home() {
+  useEffect(() => {
+    // ページ表示時ログ
+    fetch("/api/insertLog", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "トップページ表示",
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  }, []);
+
+  // リンク押下時ログ
+  function handleCardClick(action: string) {
+    fetch("/api/insertLog", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action,
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  }
+
   return (
     <>
       <Head>
@@ -35,22 +62,27 @@ export default function Home() {
               title="☆獲得人数一覧"
               description="各楽曲の☆獲得人数を一覧で確認できます。"
               imageSrc="/index_database.png"
+              onClick={() => handleCardClick("☆獲得人数一覧リンク")}
             />
             <Card
               href="/recommend"
               title="Pスコア枠おすすめ曲選出"
               description="Pスコア枠におすすめの楽曲を自動で選出します。"
               imageSrc="/index_recommend.png"
+              onClick={() => handleCardClick("Pスコア枠おすすめ曲選出リンク")}
             />
             <Card
               href="/ranking"
               title="理論値ランキング"
               description="楽曲ごとの理論値ランキングを確認できます。"
               imageSrc="/index_ranking.png"
+              onClick={() => handleCardClick("理論値ランキングリンク")}
             />
           </div>
           <div className={styles.aboutLink}>
-            <Link href="/about">このサイトについて</Link>
+            <Link href="/about" onClick={() => handleCardClick("このサイトについてリンク")}>
+              このサイトについて
+            </Link>
           </div>
         </main>
       </div>
