@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   reactStrictMode: true,
-  output: undefined,
+  output: 'standalone',
   eslint: {
     ignoreDuringBuilds: true,
   },

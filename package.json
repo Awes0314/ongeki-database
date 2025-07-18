@@ -6,7 +6,9 @@
     "dev": "next dev --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "deploy": "npx @cloudflare/next-on-pages deploy .vercel/output/static --project-name=ongeki-database",
+    "pages:build": "npx @cloudflare/next-on-pages --experimental-minify"
   },
   "dependencies": {
     "firebase": "^11.10.0",
@@ -17,6 +19,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.12",
     "@eslint/eslintrc": "^3",
     "@types/node": "^20",
     "@types/react": "^19",
