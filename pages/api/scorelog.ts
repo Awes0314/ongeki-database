@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const html = await response.text();
     res.status(200).json({ html });
   } catch (e) {
-    console.error("Fetch error:", e);
+    // console.error("Fetch error:", e);
     res.status(500).json({ error: "Unexpected error during fetch" });
   }
 }
