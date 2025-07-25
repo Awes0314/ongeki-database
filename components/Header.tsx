@@ -5,7 +5,7 @@ import styles from "@/styles/Header.module.css";
 
 const menuLinks = [
   { href: "/", label: "トップページ" },
-  { href: "/database", label: "ランキング情報一覧" },
+  { href: "/database", label: "☆獲得人数一覧" },
   { href: "/recommend", label: "Pスコア枠おすすめ曲選出" },
   { href: "/ranking", label: "理論値ランキング" },
   { href: "/about", label: "このサイトについて" },
@@ -39,7 +39,16 @@ const Header: React.FC = () => {
         buttonRef.current &&
         !buttonRef.current.contains(target)
       ) {
-        setOpen(false); // アニメーション付きで閉じる
+        // 閉じる時は一度spMenuClosingを付与してアニメーション
+        if (menuRef.current) {
+          menuRef.current.classList.add(styles.spMenuClosing);
+        }
+        setOpen(false);
+        setTimeout(() => {
+          if (menuRef.current) {
+            menuRef.current.classList.remove(styles.spMenuClosing);
+          }
+        }, 300);
       }
     };
 
@@ -70,19 +79,67 @@ const Header: React.FC = () => {
   // ハンバーガーボタン押下時
   const handleMenuBtnClick = () => {
     if (open) {
-      // アニメーション付きで閉じる
+      // 閉じる時は一度spMenuClosingを付与してアニメーション
+      if (menuRef.current) {
+        menuRef.current.classList.add(styles.spMenuClosing);
+      }
       setOpen(false);
+      setTimeout(() => {
+        if (menuRef.current) {
+          menuRef.current.classList.remove(styles.spMenuClosing);
+        }
+      }, 300);
     } else {
       setMenuVisible(true);
       setTimeout(() => setOpen(true), 10); // 少し遅延させて開く
     }
   };
 
+  // spサイズ判定
+  function isSp() {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth <= 480;
+  }
+
+  // spサイズでメニューリンク押下時に最上部へスクロール
+  const handleMenuLinkClick = (href: string) => {
+    setOpen(false);
+    if (typeof window !== "undefined" && isSp()) {
+      setTimeout(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      }, 0);
+    }
+    router.push(href);
+  };
+
   return (
     <header className={styles.header}>
-      <div className={`${styles.logo} ${scrolled ? styles.logoScrolled : ""}`}>
+      <div
+        className={`${styles.logo} ${scrolled ? styles.logoScrolled : ""}`}
+        style={{ transition: "background 0.3s" }}
+      >
         <Link href="/" aria-label="ホーム">
-          <span className={styles.logoP}>P</span>
+          <img
+            src="/favicon.ico"
+            alt="Pongeki"
+            width={30}
+            height={30}
+            style={{
+              width: 44,
+              height: 44,
+              padding: "6px",
+              borderRadius: "2px",
+              background: scrolled
+                ? "linear-gradient(135deg, #ee6c4d 0%, #ee6c4d 10%, #3d5a80 20%, #3d5a80 100%)"
+                : "none",
+              boxShadow: scrolled
+                ? "0 2px 8px rgba(61,90,128,0.10)"
+                : "none",
+              transition: "background 0.3s, box-shadow 0.3s",
+              objectFit: "cover",
+              display: "block",
+            }}
+          />
         </Link>
       </div>
       {/* index以外のみハンバーガー */}
@@ -110,14 +167,14 @@ const Header: React.FC = () => {
           >
             <nav className={styles.spMenuNav}>
               {menuLinks.map(link => (
-                <Link
+                <a
                   key={link.href}
-                  href={link.href}
                   className={styles.spMenuLink}
-                  onClick={() => setOpen(false)}
+                  onClick={() => handleMenuLinkClick(link.href)}
+                  style={{ cursor: "pointer" }}
                 >
                   {link.label}
-                </Link>
+                </a>
               ))}
             </nav>
           </div>

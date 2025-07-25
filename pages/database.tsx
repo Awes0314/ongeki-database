@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Title from "@/components/Title";
 import Header from "@/components/Header";
 
@@ -24,6 +24,19 @@ function isSp() {
   return window.innerWidth <= 480;
 }
 
+// UUID生成ユーティリティ
+function generateUUID() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // fallback
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0,
+      v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export default function Database() {
   const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
   const [sort, setSort] = useState("star");
@@ -40,16 +53,19 @@ export default function Database() {
   const renderLevelCheckbox = (level: string) => (
     <label
       key={level}
-      className={`custom-check${selectedLevels.includes(level) ? " checked" : ""}`}
       style={{
         margin: "0 0.4em 0.4em 0",
         display: "inline-block",
-        padding: "0.3em 0.8em",
-        borderRadius: "8px",
-        background: selectedLevels.includes(level) ? "rgba(61,90,128,0.15)" : "transparent",
+        padding: "6px 16px",
+        borderRadius: 20,
+        fontWeight: "bold", // 常に太字
+        color: selectedLevels.includes(level) ? "#fff" : "#3d5a80",
+        background: selectedLevels.includes(level)
+          ? "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)"
+          : "#f3f6fa",
+        border: "1.5px solid #98c1d9",
         cursor: "pointer",
-        border: "1px solid #98c1d9",
-        fontWeight: selectedLevels.includes(level) ? "bold" : "normal"
+        transition: "background 0.2s,color 0.2s",
       }}
     >
       <input
@@ -70,16 +86,19 @@ export default function Database() {
   const renderRadio = (name: string, value: string, label: string, selected: string, setSelected: (v: string) => void) => (
     <label
       key={value}
-      className={`custom-radio${selected === value ? " checked" : ""}`}
       style={{
         margin: "0 0.7em 0.7em 0",
         display: "inline-block",
-        padding: "0.3em 0.8em",
-        borderRadius: "8px",
-        background: selected === value ? "rgba(61,90,128,0.15)" : "transparent",
+        padding: "6px 16px",
+        borderRadius: 20,
+        fontWeight: "bold", // 常に太字
+        color: selected === value ? "#fff" : "#3d5a80",
+        background: selected === value
+          ? "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)"
+          : "#f3f6fa",
+        border: "1.5px solid #98c1d9",
         cursor: "pointer",
-        border: "1px solid #98c1d9",
-        fontWeight: selected === value ? "bold" : "normal"
+        transition: "background 0.2s,color 0.2s",
       }}
     >
       <input
@@ -93,8 +112,43 @@ export default function Database() {
     </label>
   );
 
+  // オプション初期値 localStorageから取得
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const levels = localStorage.getItem("database-level");
+    if (levels) {
+      try {
+        const arr = JSON.parse(levels);
+        if (Array.isArray(arr)) setSelectedLevels(arr);
+      } catch {}
+    }
+    const sort = localStorage.getItem("database-sort");
+    if (sort === "star" || sort === "const") setSort(sort);
+    const order = localStorage.getItem("database-asc-desc");
+    if (order === "asc" || order === "desc") setOrder(order);
+    const tech = localStorage.getItem("database-tech-exclude");
+    if (tech === "yes" || tech === "no") setTechExclude(tech);
+  }, []);
+
+  // user-id チェック
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let uid = localStorage.getItem("user-id");
+    if (!uid) {
+      uid = generateUUID();
+      localStorage.setItem("user-id", uid);
+    }
+  }, []);
+
   // オプションを適用ボタンの共通ハンドラ
   const handleApplyOptions = async () => {
+    // オプションをlocalStorageに保存
+    if (typeof window !== "undefined") {
+      localStorage.setItem("database-level", JSON.stringify(selectedLevels));
+      localStorage.setItem("database-sort", sort);
+      localStorage.setItem("database-asc-desc", order);
+      localStorage.setItem("database-tech-exclude", techExclude);
+    }
     setErrorMsg(null);
     setTableImageUrl(null);
     if (selectedLevels.length === 0) {
@@ -121,6 +175,14 @@ export default function Database() {
           (item: any) => !item.techFlag
         );
       }
+
+      // 画像生成前にデータ数チェック
+      if (filtered.length > 2000) {
+        setErrorMsg("選択レベルが多いため正常に生成できませんでした。\n選択数を減らして再度お試しください。");
+        setLoading(false);
+        return;
+      }
+
       // ソートキー定義
       const sortKeys =
         sort === "star"
@@ -205,6 +267,50 @@ export default function Database() {
       ctx.fillStyle = "#e0fbfc";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+      // サイトロゴ描画（左上端）
+      const logoX = leftMargin;
+      const logoY = 18;
+      const logoW = 130;
+      const logoH = 44;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(logoX + 8, logoY);
+      ctx.lineTo(logoX + logoW - 8, logoY);
+      ctx.quadraticCurveTo(logoX + logoW, logoY, logoX + logoW, logoY + 8);
+      ctx.lineTo(logoX + logoW, logoY + logoH - 8);
+      ctx.quadraticCurveTo(logoX + logoW, logoY + logoH, logoX + logoW - 8, logoY + logoH);
+      ctx.lineTo(logoX + 8, logoY + logoH);
+      ctx.quadraticCurveTo(logoX, logoY + logoH, logoX, logoY + logoH - 8);
+      ctx.lineTo(logoX, logoY + 8);
+      ctx.quadraticCurveTo(logoX, logoY, logoX + 8, logoY);
+      ctx.closePath();
+      ctx.fillStyle = "#3d5a80";
+      ctx.shadowColor = "#29324133";
+      ctx.shadowBlur = 4;
+      ctx.fill();
+      ctx.restore();
+
+      // favicon.ico描画
+      try {
+        const favicon = new window.Image();
+        favicon.src = "/favicon.ico";
+        await new Promise<void>((resolve) => {
+          favicon.onload = () => resolve();
+          favicon.onerror = () => resolve();
+        });
+        ctx.drawImage(favicon, logoX + 6, logoY + 6, 32, 32);
+      } catch {}
+      // テキスト
+      ctx.save();
+      ctx.font = "bold 15px 'Segoe UI',sans-serif";
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(41,50,65,0.10)";
+      ctx.shadowBlur = 0;
+      ctx.fillText("Pongeki", logoX + 44 + 10, logoY + logoH / 2);
+      ctx.restore();
+
       // 上端ボーダー
       ctx.save();
       ctx.beginPath();
@@ -251,10 +357,15 @@ export default function Database() {
       ctx.fillStyle = "#293241";
       const optX = canvasW - 24;
       let optY = 26;
-      ctx.fillText("Generated Datetime: " + new Date().toLocaleString("ja-JP", { hour12: false }), optX, optY);
-      ctx.fillText("Level: " + selectedLevels.join(", "), optX, optY + 24);
+      ctx.fillText(new Date().toLocaleString("ja-JP", { hour12: false }), optX, optY);
+      // selectedLevel（6個目以降は ... に変換して表示）
+      if (selectedLevels.length > 6) {
+        ctx.fillText("Level: " + selectedLevels.slice(0, 6).join(", ") + ", ...", optX, optY + 24);
+      } else {
+        ctx.fillText("Level: " + selectedLevels.join(", "), optX, optY + 24);
+      }
       ctx.fillText("Sort: " + (sort === "star" ? "☆5獲得人数" : "譜面定数") + " " + (order === "desc" ? "降順" : "昇順"), optX, optY + 48);
-      ctx.fillText("Technical Challenge: " + (techExclude === "yes" ? "除外する" : "除外しない"), optX, optY + 72);
+      ctx.fillText("テクチャレ対象曲: " + (techExclude === "yes" ? "除外する" : "除外しない"), optX, optY + 72);
       ctx.restore();
 
       // テーブルヘッダー
@@ -415,11 +526,15 @@ export default function Database() {
 
       // ログ送信 try catch
       try {
+        let userId = "";
+        if (typeof window !== "undefined") {
+          userId = localStorage.getItem("user-id") || "";
+        }
         await fetch("/api/insertLog", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            action: "オプションを適用",
+            action: "☆獲得人数一覧画像を生成",
             option: optionStr,
             levels: selectedLevels,
             sort,
@@ -427,10 +542,11 @@ export default function Database() {
             techExclude,
             userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
             timestamp: new Date().toISOString(),
+            userId,
           }),
         })
-        } catch (logError) {
-          console.error("ログ送信に失敗:", logError);
+      } catch (logError) {
+        // ログ送信失敗時は無視
       }
 
       setTableImageUrl(canvas.toDataURL());
@@ -454,6 +570,8 @@ export default function Database() {
           {LEVELS.map(renderLevelCheckbox)}
         </div>
       </div>
+      {/* 区切り線 */}
+      <div style={{ borderTop: "1px solid #e0e6ed", margin: "1.2em 2em" }} />
       <div style={{ marginBottom: "1.2em" }}>
         <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>ソート順</div>
         <div style={{ marginBottom: "0.5em" }}>
@@ -462,22 +580,26 @@ export default function Database() {
         <div style={{ marginBottom: "0.5em" }}>
           {ORDERS.map(opt => renderRadio("order", opt.value, opt.label, order, setOrder))}
         </div>
+        {/* 区切り線 */}
+        <div style={{ borderTop: "1px solid #e0e6ed", margin: "1.2em 2em" }} />
         <div>
-          <span style={{ fontWeight: "bold", marginRight: "0.7em" }}>テクニカルチャレンジ対象曲を除外</span>
+          <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>テクニカルチャレンジ対象曲を除外</div>
           {TECH_EXCLUDE.map(opt => renderRadio("tech", opt.value, opt.label, techExclude, setTechExclude))}
         </div>
       </div>
       <button
         style={{
-          marginTop: "1.2em",
-          background: "var(--main-blue)",
-          color: "#fff",
-          border: "none",
-          borderRadius: "8px",
-          padding: "0.7em 2.2em",
+          minWidth: 200,
+          fontSize: "1.08rem",
           fontWeight: "bold",
-          fontSize: "1.1em",
-          cursor: "pointer"
+          background: "linear-gradient(90deg, #ee6c4d 0%, #3d5a80 100%)",
+          border: "none",
+          borderRadius: 8,
+          color: "#fff",
+          padding: "14px 32px",
+          marginTop: 8,
+          cursor: "pointer",
+          boxShadow: "0 2px 8px #98c1d933",
         }}
         onClick={handleApplyOptions}
       >
@@ -532,124 +654,145 @@ export default function Database() {
       </div>
       {/* モーダル */}
       {modalOpen && (
-        <div style={{
-          position: "fixed",
-          top: 0, left: 0, width: "100vw", height: "100vh",
-          background: "rgba(41,50,65,0.18)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }}>
+        <>
+          <style>{`body { overflow: hidden !important; }`}</style>
           <div style={{
-            background: "#fff",
-            borderRadius: "14px",
-            width: "92vw",
-            maxWidth: 400,
-            maxHeight: "90vh",
-            overflowY: "auto",
-            boxShadow: "0 4px 24px rgba(61,90,128,0.18)",
-            padding: "1.2em 1em",
-            zIndex: 9999
+            position: "fixed",
+            top: 0, left: 0, width: "100vw", height: "100vh",
+            background: "rgba(41,50,65,0.18)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
           }}>
-            {/* タブ切り替え */}
-            <div style={{ display: "flex", marginBottom: "1.2em" }}>
+            <div style={{
+              background: "#fff",
+              borderRadius: "14px",
+              width: "92vw",
+              maxWidth: 400,
+              maxHeight: "90vh",
+              overflowY: "auto",
+              boxShadow: "0 4px 24px rgba(61,90,128,0.18)",
+              padding: "1.2em 1em",
+              zIndex: 9999
+            }}>
+              {/* タブ切り替え */}
+              <div style={{ display: "flex", marginBottom: "1.2em" }}>
+                <button
+                  style={{
+                    flex: 1,
+                    background: modalTab === "level" ? "var(--main-blue)" : "#eee",
+                    color: modalTab === "level" ? "#fff" : "#293241",
+                    border: "none",
+                    borderRadius: "8px 0 0 8px",
+                    padding: "0.7em 0",
+                    fontWeight: "bold",
+                    fontSize: "1.1em",
+                    cursor: "pointer"
+                  }}
+                  onClick={() => setModalTab("level")}
+                >
+                  レベル選択
+                </button>
+                <button
+                  style={{
+                    flex: 1,
+                    background: modalTab === "other" ? "var(--main-blue)" : "#eee",
+                    color: modalTab === "other" ? "#fff" : "#293241",
+                    border: "none",
+                    borderRadius: "0 8px 8px 0",
+                    padding: "0.7em 0",
+                    fontWeight: "bold",
+                    fontSize: "1.1em",
+                    cursor: "pointer"
+                  }}
+                  onClick={() => setModalTab("other")}
+                >
+                  その他オプション
+                </button>
+              </div>
+              {/* タブ内容 */}
+              {modalTab === "level" ? (
+                <div style={{ marginBottom: "1.2em" }}>
+                  <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>レベル選択</div>
+                  <div style={{ display: "flex", flexWrap: "wrap" }}>
+                    {LEVELS.map(renderLevelCheckbox)}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginBottom: "1.2em" }}>
+                  <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>ソート順</div>
+                  <div style={{ marginBottom: "0.5em" }}>
+                    {SORTS.map(opt => renderRadio("sort", opt.value, opt.label, sort, setSort))}
+                  </div>
+                  <div style={{ marginBottom: "0.5em" }}>
+                    {ORDERS.map(opt => renderRadio("order", opt.value, opt.label, order, setOrder))}
+                  </div>
+                  {/* 区切り線 */}
+                  <div style={{ borderTop: "1px solid #e0e6ed", margin: "1.2em 2em" }} />
+                  <div>
+                    <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>テクニカルチャレンジ対象曲を除外</div>
+                    {TECH_EXCLUDE.map(opt => renderRadio("tech", opt.value, opt.label, techExclude, setTechExclude))}
+                  </div>
+                </div>
+              )}
               <button
                 style={{
-                  flex: 1,
-                  background: modalTab === "level" ? "var(--main-blue)" : "#eee",
-                  color: modalTab === "level" ? "#fff" : "#293241",
-                  border: "none",
-                  borderRadius: "8px 0 0 8px",
-                  padding: "0.7em 0",
+                  minWidth: 200,
+                  fontSize: "1.08rem",
                   fontWeight: "bold",
-                  fontSize: "1.1em",
-                  cursor: "pointer"
-                }}
-                onClick={() => setModalTab("level")}
-              >
-                レベル選択
-              </button>
-              <button
-                style={{
-                  flex: 1,
-                  background: modalTab === "other" ? "var(--main-blue)" : "#eee",
-                  color: modalTab === "other" ? "#fff" : "#293241",
+                  background: "linear-gradient(90deg, #ee6c4d 0%, #3d5a80 100%)",
                   border: "none",
-                  borderRadius: "0 8px 8px 0",
-                  padding: "0.7em 0",
-                  fontWeight: "bold",
-                  fontSize: "1.1em",
-                  cursor: "pointer"
+                  borderRadius: 8,
+                  color: "#fff",
+                  padding: "14px 32px",
+                  marginTop: 8,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 8px #98c1d933",
                 }}
-                onClick={() => setModalTab("other")}
+                onClick={() => {
+                  setModalOpen(null);
+                  handleApplyOptions();
+                }}
               >
-                その他オプション
+                オプションを適用
               </button>
             </div>
-            {/* タブ内容 */}
-            {modalTab === "level" ? (
-              <div style={{ marginBottom: "1.2em" }}>
-                <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>レベル選択</div>
-                <div style={{ display: "flex", flexWrap: "wrap" }}>
-                  {LEVELS.map(renderLevelCheckbox)}
-                </div>
-              </div>
-            ) : (
-              <div style={{ marginBottom: "1.2em" }}>
-                <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>ソート順</div>
-                <div style={{ marginBottom: "0.5em" }}>
-                  {SORTS.map(opt => renderRadio("sort", opt.value, opt.label, sort, setSort))}
-                </div>
-                <div style={{ marginBottom: "0.5em" }}>
-                  {ORDERS.map(opt => renderRadio("order", opt.value, opt.label, order, setOrder))}
-                </div>
-                <div>
-                  <span style={{ fontWeight: "bold", marginRight: "0.7em" }}>テクニカルチャレンジ対象曲を除外</span>
-                  {TECH_EXCLUDE.map(opt => renderRadio("tech", opt.value, opt.label, techExclude, setTechExclude))}
-                </div>
-              </div>
-            )}
-            <button
+            {/* モーダル外クリックで閉じる */}
+            <div
               style={{
-                marginTop: "1.2em",
-                background: "var(--main-blue)",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                padding: "0.7em 2.2em",
-                fontWeight: "bold",
-                fontSize: "1.1em",
-                cursor: "pointer"
+                position: "fixed",
+                top: 0, left: 0, width: "100vw", height: "100vh",
+                zIndex: 1
               }}
-              onClick={() => {
-                setModalOpen(null);
-                handleApplyOptions();
-              }}
-            >
-              オプションを適用
-            </button>
+              onClick={() => setModalOpen(null)}
+            />
           </div>
-          {/* モーダル外クリックで閉じる */}
-          <div
-            style={{
-              position: "fixed",
-              top: 0, left: 0, width: "100vw", height: "100vh",
-              zIndex: 1
-            }}
-            onClick={() => setModalOpen(null)}
-          />
-        </div>
+        </>
       )}
     </>
   );
 
   // sp判定
-  const [isSpState, setIsSpState] = React.useState(false);
-  React.useEffect(() => {
+  const [isSpState, setIsSpState] = useState(false);
+  useEffect(() => {
     const check = () => setIsSpState(window.innerWidth <= 480);
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // 初期表示時ログ（useEffectは1つだけ）
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    // fetch("/api/insertLog", {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({
+    //     action: "☆獲得人数一覧表示",
+    //     userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+    //     timestamp: new Date().toISOString(),
+    //   }),
+    // });
   }, []);
 
   return (

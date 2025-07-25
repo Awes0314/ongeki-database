@@ -27,7 +27,7 @@ body::before {
   background-repeat: repeat-y;
   background-size: 100% auto;
   background-position: top center;
-  opacity: 0.3;
+  opacity: 0.5;
 }
 
 a {

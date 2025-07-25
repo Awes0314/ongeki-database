@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import Title from "@/components/Title";
 import Header from "@/components/Header";
 
@@ -45,6 +45,19 @@ function getDiffColor(diff: string) {
   }
 }
 
+// UUID生成ユーティリティ
+function generateUUID() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // fallback
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0,
+      v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export default function Recommend() {
   const [id, setId] = useState("");
   const [excludeTech, setExcludeTech] = useState("no");
@@ -57,8 +70,49 @@ export default function Recommend() {
   const [recommendCount, setRecommendCount] = useState(30); // 選曲数オプション
   const tableRef = useRef<HTMLDivElement>(null);
 
+  // 初期表示時ログ
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    // fetch("/api/insertLog", {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({
+    //     action: "Pスコア枠おすすめ曲選出表示",
+    //     userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+    //     timestamp: new Date().toISOString(),
+    //   }),
+    // });
+  }, []);
+
+  // user-id チェック
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let uid = localStorage.getItem("user-id");
+    if (!uid) {
+      uid = generateUUID();
+      localStorage.setItem("user-id", uid);
+    }
+  }, []);
+
+  // オプション初期値 localStorageから取得
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = localStorage.getItem("recommend-id");
+    if (id !== null) setId(id);
+    const count = localStorage.getItem("recommend-count");
+    if (count !== null && !isNaN(Number(count))) setRecommendCount(Number(count));
+    const tech = localStorage.getItem("recommend-tech-exclude");
+    if (tech === "yes" || tech === "no") setExcludeTech(tech);
+  }, []);
+
   async function handleRecommend(e: React.FormEvent) {
     e.preventDefault();
+    // オプションをlocalStorageに保存
+    if (typeof window !== "undefined") {
+      localStorage.setItem("recommend-id", id);
+      localStorage.setItem("recommend-count", String(recommendCount));
+      localStorage.setItem("recommend-tech-exclude", excludeTech);
+    }
     setError("");
     setResultImg(null);
     setTableHtml("");
@@ -74,6 +128,10 @@ export default function Recommend() {
 
     // ログ送信
     try {
+      let userId = "";
+      if (typeof window !== "undefined") {
+        userId = localStorage.getItem("user-id") || "";
+      }
       await fetch("/api/insertLog", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -84,6 +142,7 @@ export default function Recommend() {
           recommendCount,
           userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
           timestamp: new Date().toISOString(),
+          userId,
         }),
       });
     } catch (logError) {
@@ -258,7 +317,6 @@ export default function Recommend() {
       const pscoreIds = pMusics
         .filter((x: any) => x.star === 5)
         .map((x: any) => `${x.title}|${x.diff}`);
-        console.log("Pスコア枠除外対象:", pscoreIds);
 
       filtered = filtered.filter((row) => {
         let diffKey = "";
@@ -267,7 +325,6 @@ export default function Recommend() {
           // 先頭3文字を取得し、小文字にする
           diffKey = d.slice(0, 3).toLowerCase();
         }
-        console.log("比較対象:", `${row.musicName}|${diffKey}`);
         return !pscoreIds.includes(`${row.musicName}|${diffKey}`);
       });
 
@@ -300,7 +357,7 @@ export default function Recommend() {
       // 14. 画像生成
       setTimeout(async () => {
         // canvas生成
-        const rowH = 38;
+        const rowH = 28; // databaseと同じ
         const headerH = 120;
         const leftMargin = 18;
         const rightMargin = 18;
@@ -320,6 +377,51 @@ export default function Recommend() {
         // 背景
         ctx.fillStyle = "#e0fbfc";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // サイトロゴ描画（左上端）
+        const logoX = leftMargin;
+        const logoY = 18;
+        const logoW = 130;
+        const logoH = 44;
+        // 背景（丸みあり）
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(logoX + 8, logoY);
+        ctx.lineTo(logoX + logoW - 8, logoY);
+        ctx.quadraticCurveTo(logoX + logoW, logoY, logoX + logoW, logoY + 8);
+        ctx.lineTo(logoX + logoW, logoY + logoH - 8);
+        ctx.quadraticCurveTo(logoX + logoW, logoY + logoH, logoX + logoW - 8, logoY + logoH);
+        ctx.lineTo(logoX + 8, logoY + logoH);
+        ctx.quadraticCurveTo(logoX, logoY + logoH, logoX, logoY + logoH - 8);
+        ctx.lineTo(logoX, logoY + 8);
+        ctx.quadraticCurveTo(logoX, logoY, logoX + 8, logoY);
+        ctx.closePath();
+        ctx.fillStyle = "#3d5a80";
+        ctx.shadowColor = "#29324133";
+        ctx.shadowBlur = 4;
+        ctx.fill();
+        ctx.restore();
+
+        // favicon.ico描画
+        try {
+          const favicon = new window.Image();
+          favicon.src = "/favicon.ico";
+          await new Promise<void>((resolve) => {
+            favicon.onload = () => resolve();
+            favicon.onerror = () => resolve();
+          });
+          ctx.drawImage(favicon, logoX + 6, logoY + 6, 32, 32);
+        } catch {}
+        // テキスト
+        ctx.save();
+        ctx.font = "bold 15px 'Segoe UI',sans-serif";
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.shadowColor = "rgba(41,50,65,0.10)";
+        ctx.shadowBlur = 0;
+        ctx.fillText("Pongeki", logoX + 44 + 10, logoY + logoH / 2);
+        ctx.restore();
 
         // 上端ボーダー
         ctx.save();
@@ -367,16 +469,16 @@ export default function Recommend() {
         ctx.fillStyle = "#293241";
         const optX = canvasW - 24;
         let optY = 26;
-        ctx.fillText("Generated Datetime: " + new Date().toLocaleString("ja-JP", { hour12: false }), optX, optY);
+        ctx.fillText(new Date().toLocaleString("ja-JP", { hour12: false }), optX, optY);
         ctx.fillText("Player: " + playerName, optX, optY + 24);
         ctx.fillText("Rating: " + pRating, optX, optY + 48);
-        ctx.fillText("Option: テクチャレ除外" + (excludeTech === "yes" ? "する" : "しない") + " / 選曲数" + recommendCount, optX, optY + 72);
+        ctx.fillText("Opt.: テクチャレ" + (excludeTech === "yes" ? "除外する" : "除外しない") + " / 選曲数 " + recommendCount, optX, optY + 72);
         ctx.restore();
 
         // ヘッダー
         const headers = ["#", "Title", "Diff", "Lev(Const)", "☆5Count", "Expected Rising"];
         let x = leftMargin;
-        ctx.font = "bold 16px 'Segoe UI',sans-serif";
+        ctx.font = "bold 16px 'Segoe UI',sans-serif"; // databaseと同じ
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         for (let c = 0; c < headers.length; ++c) {
@@ -390,7 +492,7 @@ export default function Recommend() {
         }
 
         // 本体
-        ctx.font = "15px 'Segoe UI',sans-serif";
+        ctx.font = "15px 'Segoe UI',sans-serif"; // databaseと同じ
         for (let r = 0; r < finalList.length; ++r) {
           let x = leftMargin;
           const item = finalList[r];
@@ -420,7 +522,7 @@ export default function Recommend() {
           ctx.strokeRect(x, headerH + rowH * (r + 1), colW[1], rowH);
           ctx.fillStyle = "#293241";
           ctx.textAlign = "left";
-          ctx.font = "bold 15px 'Segoe UI',sans-serif";
+          ctx.font = "bold 15px 'Segoe UI',sans-serif"; // databaseと同じ
           ctx.fillText(item.musicName ?? "", x + 12, headerH + rowH * (r + 1) + rowH / 2, colW[1] - 24);
           x += colW[1];
 
@@ -439,7 +541,7 @@ export default function Recommend() {
           ctx.strokeRect(x, headerH + rowH * (r + 1), colW[2], rowH);
           ctx.fillStyle = diffColor;
           ctx.textAlign = "center";
-          ctx.font = "bold 15px 'Segoe UI',sans-serif";
+          ctx.font = "bold 15px 'Segoe UI',sans-serif"; // databaseと同じ
           ctx.fillText(item.difficulty ?? "", x + colW[2] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[2] - 8);
           x += colW[2];
 
@@ -450,7 +552,7 @@ export default function Recommend() {
           ctx.strokeRect(x, headerH + rowH * (r + 1), colW[3], rowH);
           ctx.fillStyle = "#293241";
           ctx.textAlign = "center";
-          ctx.font = "15px 'Segoe UI',sans-serif";
+          ctx.font = "15px 'Segoe UI',sans-serif"; // databaseと同じ
           let chartConstDisp = "";
           if (item.chartConst !== undefined && item.chartConst !== null && item.chartConst !== "") {
             let num = Number(item.chartConst);
@@ -471,7 +573,7 @@ export default function Recommend() {
           ctx.strokeRect(x, headerH + rowH * (r + 1), colW[4], rowH);
           ctx.fillStyle = "#293241";
           ctx.textAlign = "center";
-          ctx.font = "bold 15px 'Segoe UI',sans-serif";
+          ctx.font = "bold 15px 'Segoe UI',sans-serif"; // databaseと同じ
           ctx.fillText(item.ps5TotalCount ?? "", x + colW[4] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[4] - 8);
           x += colW[4];
 
@@ -504,36 +606,42 @@ export default function Recommend() {
 
   function handleSave() {
     if (!resultImg) return;
-    // 画像保存・共有ログ送信
-    try {
-      fetch("/api/insertLog", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "画像保存・共有",
-          userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
-          timestamp: new Date().toISOString(),
-        }),
-      });
-    } catch (e) {
-      // ログ送信失敗時は無視
+
+    // ログ送信（非同期で投げっぱなしOK）
+    let userId = "";
+    if (typeof window !== "undefined") {
+      userId = localStorage.getItem("user-id") || "";
     }
+    fetch("/api/insertLog", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "おすすめ曲画像保存・共有",
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+        timestamp: new Date().toISOString(),
+        userId,
+      }),
+    }).catch(() => {
+      // ログ送信失敗時は無視
+    });
+
     try {
       const file = dataUrlToFile(resultImg, "ongeki_recommend.png");
-      if (
-        file &&
-        typeof navigator.canShare === "function" &&
-        navigator.canShare({ files: [file] })
-      ) {
+
+      // 共有が使えるかどうかチェック
+      const canUseShare = typeof navigator.canShare === "function" &&
+                          navigator.canShare({ files: [file] });
+
+      if (canUseShare && typeof navigator.share === "function") {
         navigator.share({
           files: [file],
           title: "おすすめ楽曲表",
           text: "オンゲキおすすめ楽曲表",
         }).catch(() => {
-          // 共有キャンセル時は何もしない
+          // ユーザーがキャンセルした場合など、何もしない
         });
       } else {
-        // fallback: ダウンロード
+        // fallback: 通常の画像ダウンロード
         const a = document.createElement("a");
         a.href = resultImg;
         a.download = "ongeki_recommend.png";
@@ -542,22 +650,41 @@ export default function Recommend() {
         document.body.removeChild(a);
       }
     } catch (e) {
-      // 画像保存・共有処理エラーは無視
+      // 画像処理や保存での例外は無視（silent fail）
     }
   }
 
-  function dataUrlToFile(dataUrl: string, filename: string) {
-    try {
-      const arr = dataUrl.split(",");
-      const mime = arr[0].match(/:(.*?);/)?.[1] ?? "image/png";
-      const bstr = atob(arr[1]);
-      let n = bstr.length;
-      const u8arr = new Uint8Array(n);
-      for (let i = 0; i < n; i++) u8arr[i] = bstr.charCodeAt(i);
-      return new File([u8arr], filename, { type: mime });
-    } catch {
-      return null;
+
+  function dataUrlToFile(dataUrl: string, filename: string): File {
+    const arr = dataUrl.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : "image/png";
+    const bstr = atob(arr[1]);
+    const n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      u8arr[i] = bstr.charCodeAt(i);
     }
+    return new File([u8arr], filename, { type: mime });
+  }
+
+
+  // sp判定
+  const [isSp, setIsSp] = useState(false);
+  useEffect(() => {
+    const check = () => setIsSp(window.innerWidth <= 480);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // おすすめ楽曲数 入力ハンドラ
+  function handleRecommendCountChange(e: React.ChangeEvent<HTMLInputElement>) {
+    let val = toHankaku(e.target.value.replace(/[^0-9０-９]/g, ""));
+    let num = parseInt(val, 10);
+    if (isNaN(num)) num = 1;
+    num = Math.max(1, Math.min(100, num));
+    setRecommendCount(num);
   }
 
   return (
@@ -572,7 +699,15 @@ export default function Recommend() {
           fontSize: "1rem",
         }}
       >
-        <Title>Pスコア枠おすすめ曲選出</Title>
+        <Title>
+          {isSp ? (
+            <>
+              Pスコア枠<br />おすすめ曲選出
+            </>
+          ) : (
+            <>Pスコア枠おすすめ曲選出</>
+          )}
+        </Title>
         {/* 説明文追加 */}
         <div style={{ color: "#293241", fontSize: "1.08em", margin: "1.2em 0 2.2em 0", lineHeight: "2" }}>
           OngekiScoreLogと連携し、Pスコア枠更新におすすめの楽曲を自動で選出します。
@@ -589,18 +724,56 @@ export default function Recommend() {
             width: "100%",
           }}
         >
-          <div style={{ display: "flex", width: "100%", marginBottom: 18 }}>
-            <div style={{ width: "48%", display: "flex", flexDirection: "column", alignItems: "flex-end", paddingRight: 8 }}>
-              <label htmlFor="scorelog-id" style={{ fontWeight: "bold", color: "#3d5a80", fontSize: "1rem", textAlign: "right", width: "100%" }}>
+          {/* OngekiScoreLog ID */}
+          <div style={{
+            display: "flex",
+            width: "100%",
+            marginBottom: 18,
+            alignItems: "center",
+          }}>
+            <div style={{
+              width: "48%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              paddingRight: 8,
+              justifyContent: "center",
+              height: "100%",
+              textAlign: "right", // 右詰め
+            }}>
+              <label htmlFor="scorelog-id" style={{
+                fontWeight: "bold",
+                color: "#3d5a80",
+                fontSize: "1rem",
+                textAlign: "right",
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                height: "100%",
+                justifyContent: "flex-end", // 右詰め
+              }}>
                 OngekiScoreLog ID
               </label>
             </div>
-            <div style={{ width: "48%", display: "flex", flexDirection: "column", alignItems: "flex-start", paddingLeft: 8 }}>
+            <div style={{
+              width: "48%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              paddingLeft: 8,
+              justifyContent: "center",
+              height: "100%",
+            }}>
               <input
                 id="scorelog-id"
                 type="text"
                 value={id}
-                onChange={(e) => setId(toHankaku(e.target.value))}
+                onChange={(e) => {
+                  // 6文字以上入力不可
+                  let v = toHankaku(e.target.value).replace(/[^0-9]/g, "");
+                  if (v.length > 5) v = v.slice(0, 5);
+                  setId(v);
+                }}
                 maxLength={5}
                 pattern="[0-9]{1,5}"
                 style={{
@@ -615,18 +788,65 @@ export default function Recommend() {
                 }}
                 placeholder="半角数字1～5桁"
                 required
+                inputMode="numeric"
+                autoComplete="off"
               />
             </div>
           </div>
-          <div style={{ display: "flex", width: "100%", marginBottom: 18 }}>
-            <div style={{ width: "48%", display: "flex", flexDirection: "column", alignItems: "flex-end", paddingRight: 8 }}>
-              <label htmlFor="exclude-tech" style={{ fontWeight: "bold", color: "#3d5a80", fontSize: "1rem", textAlign: "right", width: "100%" }}>
-                テクニカルチャレンジ対象曲を除外
+          {/* テクチャレ除外 */}
+          <div style={{
+            display: "flex",
+            width: "100%",
+            marginBottom: 18,
+            alignItems: "center",
+          }}>
+            <div style={{
+              width: "48%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              paddingRight: 8,
+              justifyContent: "center",
+              height: "100%",
+              textAlign: "right", // 右詰め
+            }}>
+              <label htmlFor="exclude-tech" style={{
+                fontWeight: "bold",
+                color: "#3d5a80",
+                fontSize: "1rem",
+                textAlign: "right",
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                height: "100%",
+                whiteSpace: "pre-line",
+                justifyContent: "flex-end", // 右詰め
+              }}>
+                {isSp ? "テクニカルチャレンジ\n対象曲を除外" : "テクニカルチャレンジ対象曲を除外"}
               </label>
             </div>
-            <div style={{ width: "48%", display: "flex", flexDirection: "column", alignItems: "flex-start", paddingLeft: 8 }}>
+            <div style={{
+              width: "48%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              paddingLeft: 8,
+              justifyContent: "center",
+              height: "100%",
+            }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <label style={{ display: "inline-block", padding: "6px 16px", borderRadius: 20, fontWeight: "bold", color: excludeTech === "yes" ? "#fff" : "#3d5a80", background: excludeTech === "yes" ? "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)" : "#f3f6fa", border: "1.5px solid #98c1d9", cursor: "pointer" }}>
+                <label style={{
+                  display: "inline-block",
+                  padding: "6px 16px",
+                  borderRadius: 20,
+                  fontWeight: "bold",
+                  color: excludeTech === "yes" ? "#fff" : "#3d5a80",
+                  background: excludeTech === "yes"
+                    ? "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)"
+                    : "#f3f6fa",
+                  border: "1.5px solid #98c1d9",
+                  cursor: "pointer"
+                }}>
                   <input
                     type="radio"
                     name="exclude-tech"
@@ -637,7 +857,18 @@ export default function Recommend() {
                   />
                   する
                 </label>
-                <label style={{ display: "inline-block", padding: "6px 16px", borderRadius: 20, fontWeight: "bold", color: excludeTech === "no" ? "#fff" : "#3d5a80", background: excludeTech === "no" ? "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)" : "#f3f6fa", border: "1.5px solid #98c1d9", cursor: "pointer" }}>
+                <label style={{
+                  display: "inline-block",
+                  padding: "6px 16px",
+                  borderRadius: 20,
+                  fontWeight: "bold",
+                  color: excludeTech === "no" ? "#fff" : "#3d5a80",
+                  background: excludeTech === "no"
+                    ? "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)"
+                    : "#f3f6fa",
+                  border: "1.5px solid #98c1d9",
+                  cursor: "pointer"
+                }}>
                   <input
                     type="radio"
                     name="exclude-tech"
@@ -651,20 +882,55 @@ export default function Recommend() {
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", width: "100%", marginBottom: 18 }}>
-            <div style={{ width: "48%", display: "flex", flexDirection: "column", alignItems: "flex-end", paddingRight: 8 }}>
-              <label htmlFor="recommend-count" style={{ fontWeight: "bold", color: "#3d5a80", fontSize: "1rem", textAlign: "right", width: "100%" }}>
+          {/* おすすめ楽曲数 */}
+          <div style={{
+            display: "flex",
+            width: "100%",
+            marginBottom: 18,
+            alignItems: "center",
+          }}>
+            <div style={{
+              width: "48%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              paddingRight: 8,
+              justifyContent: "center",
+              height: "100%",
+              textAlign: "right", // 右詰め
+            }}>
+              <label htmlFor="recommend-count" style={{
+                fontWeight: "bold",
+                color: "#3d5a80",
+                fontSize: "1rem",
+                textAlign: "right",
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                height: "100%",
+                justifyContent: "flex-end", // 右詰め
+              }}>
                 おすすめ楽曲数
               </label>
             </div>
-            <div style={{ width: "48%", display: "flex", flexDirection: "column", alignItems: "flex-start", paddingLeft: 8 }}>
+            <div style={{
+              width: "48%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              paddingLeft: 8,
+              justifyContent: "center",
+              height: "100%",
+            }}>
               <input
                 id="recommend-count"
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9０-９]{1,3}"
                 value={recommendCount}
-                onChange={(e) => setRecommendCount(Math.max(1, Math.min(50, parseInt(e.target.value))))}
+                onChange={handleRecommendCountChange}
                 min={1}
-                max={50}
+                max={100}
                 style={{
                   padding: "10px 16px",
                   fontSize: "1rem",
@@ -675,8 +941,9 @@ export default function Recommend() {
                   background: "#e0fbfc",
                   color: "#293241",
                 }}
-                placeholder="1〜50"
+                placeholder="1〜100"
                 required
+                autoComplete="off"
               />
             </div>
           </div>
@@ -794,7 +1061,8 @@ export default function Recommend() {
           <b>【選出仕様】</b><br />
           ・現在のPスコア枠を参考に、「☆5獲得でPスコア枠更新が見込める楽曲」を選出します。<br />
           ・おすすめ上位の楽曲は、☆5獲得人数が多い楽曲を優先して選出します。<br />
-          ・オプション項目にて、テクニカルチャレンジ対象曲となったことのある楽曲を除外することができます。
+          ・オプション項目にて、テクニカルチャレンジ対象曲となったことのある楽曲を除外することができます。<br />
+          ・「Expected Rising」は、☆5獲得時に見込める上昇レーティング想定値です。
         </div>
       </main>
       <style>{`

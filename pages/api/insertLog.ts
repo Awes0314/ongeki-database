@@ -11,7 +11,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(405).json({ error: "Method not allowed" });
     return;
   }
-  const { action, userAgent, timestamp, ...rest } = req.body;
+  // 受け取る: action, userAgent, timestamp, userId, option
+  const {
+    action,
+    userAgent,
+    timestamp,
+    userId,
+    option
+  } = req.body;
 
   try {
     // Google認証
@@ -24,21 +31,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     const sheets = google.sheets({ version: "v4", auth });
 
-    // 先頭行を挿入する
-    await sheets.spreadsheets.values.append({
+    // 日本時間
+    const jst = new Date();
+    const jstStr = new Date(jst.getTime() + 9 * 60 * 60 * 1000)
+      .toISOString()
+      .replace("T", " ")
+      .replace(/\.\d+Z$/, "");
+
+    // 1行目に追加（既存データを取得して先頭に新規行を追加して上書き）
+    const getRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: SHEET_NAME,
+    });
+    const rows = getRes.data.values || [];
+    const newRow = [
+      jstStr,
+      action || "",
+      userAgent || "",
+      userId || "",
+      option || "",
+    ];
+    rows.unshift(newRow);
+    await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
       range: SHEET_NAME,
       valueInputOption: "RAW",
-      insertDataOption: "INSERT_ROWS",
       requestBody: {
-        values: [
-          [
-            timestamp || new Date().toISOString(),
-            action || "",
-            userAgent || "",
-            JSON.stringify(rest),
-          ],
-        ],
+        values: rows,
       },
     });
 

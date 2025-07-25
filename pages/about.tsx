@@ -4,15 +4,16 @@ import { useEffect } from "react";
 
 export default function About() {
   useEffect(() => {
-    fetch("/api/insertLog", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "このサイトについて表示",
-        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
-        timestamp: new Date().toISOString(),
-      }),
-    });
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    // fetch("/api/insertLog", {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({
+    //     action: "このサイトについて表示",
+    //     userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+    //     timestamp: new Date().toISOString(),
+    //   }),
+    // });
   }, []);
 
   return (
@@ -23,8 +24,8 @@ export default function About() {
         <section style={{ color: "#293241", fontSize: "1rem", lineHeight: "2", marginBottom: "2.5rem" }}>
           <h2 style={{ fontSize: "1.1em", fontWeight: "bold", marginTop: "2rem" }}>サイトの概要</h2>
           <p>
-            本サイトは、音楽ゲーム「オンゲキ（Ongeki）」に関する楽曲情報を、見やすく整理して提供するファンメイドの情報サイトです。<br />
-            プレイヤーの参考になるよう、スプレッドシートを活用したデータベース表示や、おすすめ楽曲の自動抽出機能などを備えています。
+            本サイトは、セガ フェイブ開発・運営の音楽ゲーム「オンゲキ（O.N.G.E.K.I.）」に関する楽曲別ランキング集計情報を提供するファンメイドの情報サイトです。<br />
+            プレイヤーの参考となるよう、一覧化したデータベース表示、おすすめ楽曲の自動選出機能などを備えています。
           </p>
           <p>
             今後もオンゲキを楽しむプレイヤーの皆さまにとって便利な情報サイトを目指して、個人の趣味としてゆるやかに更新を続けていく予定です。
@@ -35,9 +36,9 @@ export default function About() {
             以下の公開情報やサイト様のデータをもとに構成しています（敬称略・順不同）：
           </p>
           <ul style={{ marginLeft: "1.5em" }}>
-            <li>オンゲキ公式サイト（楽曲情報・ジャケット・難易度 など）</li>
-            <li>OngekiScoreLog（スコア記録・達成率・定数情報 など）</li>
-            <li>オンゲキ譜面定数部（譜面定数・難易度表 など）</li>
+            <li>オンゲキ-NET（楽曲情報・難易度・全国ランキング など）</li>
+            <li>OngekiScoreLog（各プレイヤーのスコア・定数情報 など）</li>
+            <li>オンゲキ譜面定数部（譜面定数・難易度 など）</li>
           </ul>
           <p>
             データの取得や整形は自動化処理によって行っており、リアルタイムでの更新には対応していません。<br />
@@ -56,7 +57,7 @@ export default function About() {
 
           <h2 style={{ fontSize: "1.1em", fontWeight: "bold", marginTop: "2rem" }}>著作権について</h2>
           <p>
-            本サイトで使用している文章やデータの一部は、公式サイトや各種情報サイト様の公開情報を元に構成しています。<br />
+            本サイトで使用している文言やデータの一部は、公式サイトや各種情報サイト様の公開情報を元に構成しています。<br />
             ただし、画像や音声などの著作権保護対象となる素材は一切使用しておりません。<br />
             また、引用元や参考元がある場合は、できる限り明記するよう努めています。
           </p>
@@ -66,10 +67,10 @@ export default function About() {
 
           <h2 style={{ fontSize: "1.1em", fontWeight: "bold", marginTop: "2rem" }}>お問い合わせ</h2>
           <p>
-            サイト運営に関するご意見・ご質問・修正依頼などは、以下のTwitterアカウントのDMまたはリプライにてご連絡ください。
+            サイト運営に関するご意見・ご質問・修正依頼などは、以下のXアカウントのDMまたはリプライにてご連絡ください。
           </p>
           <p>
-            👉 Twitter:{" "}
+            管理人 Xアカウント:{" "}
             <a
               href="https://twitter.com/Extra_Awes"
               target="_blank"

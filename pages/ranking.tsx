@@ -12,6 +12,20 @@ export default function Ranking() {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // 初期表示時ログ
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    // fetch("/api/insertLog", {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({
+    //     action: "理論値ランキング表示",
+    //     userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+    //     timestamp: new Date().toISOString(),
+    //   }),
+    // });
+  }, []);
+
   useEffect(() => {
     setImgUrl(null);
     setLoading(true);
@@ -207,7 +221,7 @@ export default function Ranking() {
           );
           ctx.fillStyle = "#293241";
           ctx.textAlign = "left";
-          ctx.font = "bold 15px 'Segoe UI',sans-serif";
+          ctx.font = "bold 18px 'Segoe UI',sans-serif";
           ctx.fillText(
             item[0] ?? "",
             x + 12,
@@ -251,7 +265,7 @@ export default function Ranking() {
           );
           ctx.fillStyle = diffColor;
           ctx.textAlign = "center";
-          ctx.font = "bold 15px 'Segoe UI',sans-serif";
+          ctx.font = "bold 18px 'Segoe UI',sans-serif";
           ctx.fillText(
             item[1] ?? "",
             x + colW[1] / 2,
@@ -277,7 +291,7 @@ export default function Ranking() {
           );
           ctx.fillStyle = "#293241";
           ctx.textAlign = "center";
-          ctx.font = "15px 'Segoe UI',sans-serif";
+          ctx.font = "18px 'Segoe UI',sans-serif";
           ctx.fillText(
             item[2] ?? "",
             x + colW[2] / 2,
@@ -331,7 +345,7 @@ export default function Ranking() {
           );
           ctx.fillStyle = fg;
           ctx.textAlign = "center";
-          ctx.font = "bold 15px 'Segoe UI',sans-serif";
+          ctx.font = "bold 20px 'Segoe UI',sans-serif";
           ctx.fillText(
             item[3] ?? "",
             x + colW[3] / 2,
@@ -346,13 +360,18 @@ export default function Ranking() {
 
   const handleTabChange = (key: "ts1" | "ps") => {
     setTab(key);
+    let userId = "";
+    if (typeof window !== "undefined") {
+      userId = localStorage.getItem("user-id") || "";
+    }
     fetch("/api/insertLog", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        action: key === "ts1" ? "TS1位理論値回数" : "PS理論値人数",
+        action: key === "ts1" ? "TS1位理論値回数ランキングを表示" : "PS理論値人数ランキングを表示",
         userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
         timestamp: new Date().toISOString(),
+        userId,
       }),
     });
   };
