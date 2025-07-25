@@ -361,9 +361,13 @@ export default function Ranking() {
   const handleTabChange = (key: "ts1" | "ps") => {
     setTab(key);
     let userId = "";
+    let userName = "";
     if (typeof window !== "undefined") {
       userId = localStorage.getItem("user-id") || "";
+      userName = localStorage.getItem("user-name") || "";
     }
+    // option: user-name（あれば）
+    const optionStr = userName ? `user-name: ${userName}` : "";
     fetch("/api/insertLog", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -372,6 +376,7 @@ export default function Ranking() {
         userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
         timestamp: new Date().toISOString(),
         userId,
+        option: optionStr,
       }),
     });
   };

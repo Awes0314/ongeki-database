@@ -527,19 +527,24 @@ export default function Database() {
       // ログ送信 try catch
       try {
         let userId = "";
+        let userName = "";
         if (typeof window !== "undefined") {
           userId = localStorage.getItem("user-id") || "";
+          userName = localStorage.getItem("user-name") || "";
         }
+        // option: レベル・ソート・テクチャレ除外・user-name（あれば）
+        const optionStr = [
+          `レベル: ${selectedLevels.join(",")}`,
+          `ソート: ${sort === "star" ? "☆5獲得人数" : "譜面定数"}${order === "desc" ? "降順" : "昇順"}`,
+          `テクチャレ除外: ${techExclude === "yes" ? "する" : "しない"}`,
+          userName ? `user-name: ${userName}` : null
+        ].filter(Boolean).join(" / ");
         await fetch("/api/insertLog", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             action: "☆獲得人数一覧画像を生成",
             option: optionStr,
-            levels: selectedLevels,
-            sort,
-            order,
-            techExclude,
             userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
             timestamp: new Date().toISOString(),
             userId,

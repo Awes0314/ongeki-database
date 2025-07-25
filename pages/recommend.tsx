@@ -119,9 +119,24 @@ export default function Recommend() {
     setPlayerName("");
     setRatingRange(null);
 
+    // 0文字の場合は「1」をセット
     let inputId = toHankaku(id.trim());
+    if (inputId.length === 0) {
+      inputId = "1";
+      setId("1");
+      if (typeof window !== "undefined") {
+        localStorage.setItem("recommend-id", "1");
+      }
+    }
+    // おすすめ楽曲数が0文字の場合はエラー
+    if (
+      (recommendCount == 0)
+    ) {
+      alert("おすすめ楽曲数は1～100の半角数字で入力してください");
+      return;
+    }
     if (!/^\d{1,5}$/.test(inputId)) {
-      alert("OngekiScoreLog IDは半角数字1～5桁で入力してください");
+      alert("OngekiScoreLog IDは半角数字0～5桁で入力してください");
       return;
     }
     setLoading(true);
@@ -129,17 +144,24 @@ export default function Recommend() {
     // ログ送信
     try {
       let userId = "";
+      let userName = "";
       if (typeof window !== "undefined") {
         userId = localStorage.getItem("user-id") || "";
+        userName = localStorage.getItem("user-name") || "";
       }
+      // option: OngekiScoreLog ID・user-name（あれば）・テクチャレ除外・選曲数
+      const optionStr = [
+        `OngekiScoreLog ID: ${inputId}`,
+        userName ? `user-name: ${userName}` : null,
+        `テクチャレ除外: ${excludeTech}`,
+        `選曲数: ${recommendCount}`
+      ].filter(Boolean).join(" / ");
       await fetch("/api/insertLog", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "おすすめ楽曲を選出",
-          id,
-          excludeTech,
-          recommendCount,
+          option: optionStr,
           userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
           timestamp: new Date().toISOString(),
           userId,
@@ -176,6 +198,11 @@ export default function Recommend() {
         }
       } catch (e) {
         playerName = "";
+      }
+
+      // プレイヤー名をlocalStorageに保存
+      if (typeof window !== "undefined" && playerName) {
+        localStorage.setItem("user-name", playerName);
       }
 
       // --- Pスコアレーティング抽出 ---
@@ -455,13 +482,6 @@ export default function Recommend() {
         ctx.stroke();
         ctx.restore();
 
-        // タイトル
-        ctx.font = "bold 28px 'Segoe UI',sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillStyle = "#3d5a80";
-        ctx.fillText("Pスコア枠おすすめ楽曲", leftMargin + (tableW - leftMargin - rightMargin) / 2, headerH / 2);
-
         // オプション表示（右上）
         ctx.save();
         ctx.font = "15px 'Segoe UI',sans-serif";
@@ -604,19 +624,37 @@ export default function Recommend() {
     }
   }
 
+  // おすすめ楽曲数 入力ハンドラ
+  function handleRecommendCountChange(e: React.ChangeEvent<HTMLInputElement>) {
+    let val = toHankaku(e.target.value.replace(/[^0-9０-９]/g, ""));
+    if (val === "") {
+      setRecommendCount(0);
+      return;
+    }
+    let num = parseInt(val, 10);
+    if (isNaN(num)) num = 1;
+    num = Math.max(1, Math.min(100, num));
+    setRecommendCount(num);
+  }
+
   function handleSave() {
     if (!resultImg) return;
 
     // ログ送信（非同期で投げっぱなしOK）
     let userId = "";
+    let userName = "";
     if (typeof window !== "undefined") {
       userId = localStorage.getItem("user-id") || "";
+      userName = localStorage.getItem("user-name") || "";
     }
+    // option: user-name（あれば）
+    const optionStr = userName ? `user-name: ${userName}` : "";
     fetch("/api/insertLog", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "おすすめ曲画像保存・共有",
+        option: optionStr,
         userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
         timestamp: new Date().toISOString(),
         userId,
@@ -677,15 +715,6 @@ export default function Recommend() {
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
-
-  // おすすめ楽曲数 入力ハンドラ
-  function handleRecommendCountChange(e: React.ChangeEvent<HTMLInputElement>) {
-    let val = toHankaku(e.target.value.replace(/[^0-9０-９]/g, ""));
-    let num = parseInt(val, 10);
-    if (isNaN(num)) num = 1;
-    num = Math.max(1, Math.min(100, num));
-    setRecommendCount(num);
-  }
 
   return (
     <>
@@ -775,7 +804,7 @@ export default function Recommend() {
                   setId(v);
                 }}
                 maxLength={5}
-                pattern="[0-9]{1,5}"
+                pattern="[0-9]{0,5}"
                 style={{
                   padding: "10px 16px",
                   fontSize: "1rem",
@@ -786,7 +815,7 @@ export default function Recommend() {
                   background: "#e0fbfc",
                   color: "#293241",
                 }}
-                placeholder="半角数字1～5桁"
+                placeholder="半角数字0～5桁"
                 required
                 inputMode="numeric"
                 autoComplete="off"
@@ -926,8 +955,8 @@ export default function Recommend() {
                 id="recommend-count"
                 type="text"
                 inputMode="numeric"
-                pattern="[0-9０-９]{1,3}"
-                value={recommendCount}
+                pattern="[0-9０-９]{0,3}"
+                value={recommendCount === 0 ? "" : recommendCount}
                 onChange={handleRecommendCountChange}
                 min={1}
                 max={100}
