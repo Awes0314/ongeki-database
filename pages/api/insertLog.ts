@@ -37,13 +37,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .toISOString()
       .replace("T", " ")
       .replace(/\.\d+Z$/, "");
+    // yyyymmdd
+    const jstDate = new Date(jst.getTime() + 9 * 60 * 60 * 1000);
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    const yyyymmdd = `${jstDate.getFullYear()}${pad(jstDate.getMonth() + 1)}${pad(jstDate.getDate())}`;
+    const sheetName = yyyymmdd;
 
-    // 1行目に追加（既存データを取得して先頭に新規行を追加して上書き）
+    // シート一覧取得
+    const spreadsheet = await sheets.spreadsheets.get({
+      spreadsheetId: SHEET_ID,
+      includeGridData: false,
+    });
+    const sheetList = spreadsheet.data.sheets?.map(s => s.properties?.title) ?? [];
+
+    // シートがなければ追加
+    if (!sheetList.includes(sheetName)) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: sheetName,
+                },
+              },
+            },
+          ],
+        },
+      });
+      // 1行目にヘッダー追加
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID,
+        range: sheetName,
+        valueInputOption: "RAW",
+        requestBody: {
+          values: [
+            ["datetime", "action", "userAgent", "userId", "option"]
+          ],
+        },
+      });
+    }
+
+    // 既存データ取得
     const getRes = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: SHEET_NAME,
+      range: sheetName,
     });
     const rows = getRes.data.values || [];
+    // 2行目以降にデータがある場合、1行目はヘッダー
+    const isHeader = rows.length > 0 && rows[0][0] === "datetime";
     const newRow = [
       jstStr,
       action || "",
@@ -51,10 +94,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       userId || "",
       option || "",
     ];
-    rows.unshift(newRow);
+    if (isHeader) {
+      rows.splice(1, 0, newRow); // ヘッダーの直後に追加
+    } else {
+      rows.unshift(newRow);
+    }
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
-      range: SHEET_NAME,
+      range: sheetName,
       valueInputOption: "RAW",
       requestBody: {
         values: rows,

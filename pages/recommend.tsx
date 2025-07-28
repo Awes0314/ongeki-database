@@ -144,18 +144,17 @@ export default function Recommend() {
     // ログ送信
     try {
       let userId = "";
-      let userName = "";
+      let optionStr = "";
       if (typeof window !== "undefined") {
         userId = localStorage.getItem("user-id") || "";
-        userName = localStorage.getItem("user-name") || "";
+        // localStorage全要素をJson化
+        const obj: Record<string, string> = {};
+        for (let i = 0; i < localStorage.length; ++i) {
+          const key = localStorage.key(i);
+          if (key) obj[key] = localStorage.getItem(key) ?? "";
+        }
+        optionStr = JSON.stringify(obj);
       }
-      // option: OngekiScoreLog ID・user-name（あれば）・テクチャレ除外・選曲数
-      const optionStr = [
-        `OngekiScoreLog ID: ${inputId}`,
-        userName ? `user-name: ${userName}` : null,
-        `テクチャレ除外: ${excludeTech}`,
-        `選曲数: ${recommendCount}`
-      ].filter(Boolean).join(" / ");
       await fetch("/api/insertLog", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -642,13 +641,17 @@ export default function Recommend() {
 
     // ログ送信（非同期で投げっぱなしOK）
     let userId = "";
-    let userName = "";
+    let optionStr = "";
     if (typeof window !== "undefined") {
       userId = localStorage.getItem("user-id") || "";
-      userName = localStorage.getItem("user-name") || "";
+      // localStorage全要素をJson化
+      const obj: Record<string, string> = {};
+      for (let i = 0; i < localStorage.length; ++i) {
+        const key = localStorage.key(i);
+        if (key) obj[key] = localStorage.getItem(key) ?? "";
+      }
+      optionStr = JSON.stringify(obj);
     }
-    // option: user-name（あれば）
-    const optionStr = userName ? `user-name: ${userName}` : "";
     fetch("/api/insertLog", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

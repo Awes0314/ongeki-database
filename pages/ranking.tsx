@@ -361,13 +361,17 @@ export default function Ranking() {
   const handleTabChange = (key: "ts1" | "ps") => {
     setTab(key);
     let userId = "";
-    let userName = "";
+    let optionStr = "";
     if (typeof window !== "undefined") {
       userId = localStorage.getItem("user-id") || "";
-      userName = localStorage.getItem("user-name") || "";
+      // localStorage全要素をJson化
+      const obj: Record<string, string> = {};
+      for (let i = 0; i < localStorage.length; ++i) {
+        const keyName = localStorage.key(i);
+        if (keyName) obj[keyName] = localStorage.getItem(keyName) ?? "";
+      }
+      optionStr = JSON.stringify(obj);
     }
-    // option: user-name（あれば）
-    const optionStr = userName ? `user-name: ${userName}` : "";
     fetch("/api/insertLog", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

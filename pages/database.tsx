@@ -527,18 +527,17 @@ export default function Database() {
       // ログ送信 try catch
       try {
         let userId = "";
-        let userName = "";
+        let optionStr = "";
         if (typeof window !== "undefined") {
           userId = localStorage.getItem("user-id") || "";
-          userName = localStorage.getItem("user-name") || "";
+          // localStorage全要素をJson化
+          const obj: Record<string, string> = {};
+          for (let i = 0; i < localStorage.length; ++i) {
+            const key = localStorage.key(i);
+            if (key) obj[key] = localStorage.getItem(key) ?? "";
+          }
+          optionStr = JSON.stringify(obj);
         }
-        // option: レベル・ソート・テクチャレ除外・user-name（あれば）
-        const optionStr = [
-          `レベル: ${selectedLevels.join(",")}`,
-          `ソート: ${sort === "star" ? "☆5獲得人数" : "譜面定数"}${order === "desc" ? "降順" : "昇順"}`,
-          `テクチャレ除外: ${techExclude === "yes" ? "する" : "しない"}`,
-          userName ? `user-name: ${userName}` : null
-        ].filter(Boolean).join(" / ");
         await fetch("/api/insertLog", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
