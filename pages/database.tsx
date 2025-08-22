@@ -7,7 +7,8 @@ const LEVELS = [
   "9+", "9", "8+", "8", "7+", "7", "6", "5", "4", "3", "2", "1", "0"
 ];
 const SORTS = [
-  { value: "star", label: "☆5獲得人数" },
+  { value: "star", label: "☆5 人数" },
+  { value: "rainbow", label: "☆5(虹) 人数" },
   { value: "const", label: "譜面定数" }
 ];
 const ORDERS = [
@@ -15,6 +16,10 @@ const ORDERS = [
   { value: "asc", label: "昇順" }
 ];
 const TECH_EXCLUDE = [
+  { value: "yes", label: "する" },
+  { value: "no", label: "しない" }
+];
+const SOLO_EXCLUDE = [
   { value: "yes", label: "する" },
   { value: "no", label: "しない" }
 ];
@@ -42,6 +47,7 @@ export default function Database() {
   const [sort, setSort] = useState("star");
   const [order, setOrder] = useState("desc");
   const [techExclude, setTechExclude] = useState("no");
+  const [soloExclude, setSoloExclude] = useState("yes");
   const [modalOpen, setModalOpen] = useState<null | "level" | "other">(null);
   const [modalTab, setModalTab] = useState<"level" | "other">("level");
   const [loading, setLoading] = useState(false);
@@ -82,35 +88,28 @@ export default function Database() {
     </label>
   );
 
-  // ラジオカスタム
-  const renderRadio = (name: string, value: string, label: string, selected: string, setSelected: (v: string) => void) => (
-    <label
-      key={value}
-      style={{
-        margin: "0 0.7em 0.7em 0",
-        display: "inline-block",
-        padding: "6px 16px",
-        borderRadius: 20,
-        fontWeight: "bold", // 常に太字
-        color: selected === value ? "#fff" : "#3d5a80",
-        background: selected === value
-          ? "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)"
-          : "#f3f6fa",
-        border: "1.5px solid #98c1d9",
-        cursor: "pointer",
-        transition: "background 0.2s,color 0.2s",
-      }}
-    >
-      <input
-        type="radio"
-        name={name}
-        checked={selected === value}
-        onChange={() => setSelected(value)}
-        style={{ display: "none" }}
-      />
-      {label}
-    </label>
-  );
+  // 分割ボタン用スタイル
+  const segmentedControlStyle = {
+    display: "inline-flex",
+    borderRadius: "999px",
+    overflow: "hidden",
+    border: "1.5px solid #98c1d9",
+    background: "#e0fbfc",
+    marginBottom: "1rem",
+    gap: "0px"
+  };
+  const segmentStyle = (selected: boolean) => ({
+    padding: "8px 18px",
+    background: selected ? "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)" : "#f3f6fa",
+    color: selected ? "#fff" : "#3d5a80",
+    border: "none",
+    fontWeight: "bold",
+    cursor: "pointer",
+    fontSize: "1.05em",
+    transition: "background 0.2s",
+    minWidth: "unset",
+    flex: "unset",
+  });
 
   // オプション初期値 localStorageから取得
   useEffect(() => {
@@ -123,11 +122,13 @@ export default function Database() {
       } catch {}
     }
     const sort = localStorage.getItem("database-sort");
-    if (sort === "star" || sort === "const") setSort(sort);
+    if (sort === "star" || sort === "const" || sort === "rainbow") setSort(sort);
     const order = localStorage.getItem("database-asc-desc");
     if (order === "asc" || order === "desc") setOrder(order);
     const tech = localStorage.getItem("database-tech-exclude");
     if (tech === "yes" || tech === "no") setTechExclude(tech);
+    const solo = localStorage.getItem("database-solo-exclude");
+    if (solo === "yes" || solo === "no") setSoloExclude(solo);
   }, []);
 
   // user-id チェック
@@ -148,6 +149,7 @@ export default function Database() {
       localStorage.setItem("database-sort", sort);
       localStorage.setItem("database-asc-desc", order);
       localStorage.setItem("database-tech-exclude", techExclude);
+      localStorage.setItem("database-solo-exclude", soloExclude);
     }
     setErrorMsg(null);
     setTableImageUrl(null);
@@ -175,6 +177,12 @@ export default function Database() {
           (item: any) => !item.techFlag
         );
       }
+      // ソロver.除外
+      if (soloExclude === "yes") {
+        filtered = filtered.filter(
+          (item: any) => !(item.musicName && item.musicName.includes("ソロver"))
+        );
+      }
 
       // 画像生成前にデータ数チェック
       if (filtered.length > 2000) {
@@ -196,7 +204,19 @@ export default function Database() {
               "chartConst",
               "ts1TheoryCount",
             ]
-          : [
+          : sort === "rainbow"
+          ? [
+              "ps5RainbowCount",
+              "ps5TotalCount",
+              "ps4Count",
+              "ps3Count",
+              "ps2Count",
+              "ps1Count",
+              "chartConst",
+              "ts1TheoryCount",
+            ]
+          : sort === "const"
+          ? [
               "chartConst",
               "ps5TotalCount",
               "ps4Count",
@@ -205,7 +225,8 @@ export default function Database() {
               "ps1Count",
               "ps5RainbowCount",
               "ts1TheoryCount",
-            ];
+            ]
+          : [];
       // ソート関数
       filtered.sort((a: any, b: any) => {
         for (const key of sortKeys) {
@@ -222,7 +243,8 @@ export default function Database() {
       const optionStr = [
         `レベル: ${selectedLevels.join(",")}`,
         `ソート: ${sort === "star" ? "☆5獲得人数" : "譜面定数"}${order === "desc" ? "降順" : "昇順"}`,
-        `テクチャレ除外: ${techExclude === "yes" ? "する" : "しない"}`
+        `テクチャレ除外: ${techExclude === "yes" ? "する" : "しない"}`,
+        `ソロver.除外: ${soloExclude === "yes" ? "する" : "しない"}`
       ].join(" / ");
 
       // 表示用データ整形
@@ -360,16 +382,19 @@ export default function Database() {
       ctx.fillText(new Date().toLocaleString("ja-JP", { hour12: false }), optX, optY);
       // selectedLevel（6個目以降は ... に変換して表示）
       if (selectedLevels.length > 6) {
-        ctx.fillText("Level: " + selectedLevels.slice(0, 6).join(", ") + ", ...", optX, optY + 24);
+        ctx.fillText("Level: " + selectedLevels.slice(0, 6).join(", ") + ", ...", optX, optY + 20);
       } else {
-        ctx.fillText("Level: " + selectedLevels.join(", "), optX, optY + 24);
+        ctx.fillText("Level: " + selectedLevels.join(", "), optX, optY + 20);
       }
-      ctx.fillText("Sort: " + (sort === "star" ? "☆5獲得人数" : "譜面定数") + " " + (order === "desc" ? "降順" : "昇順"), optX, optY + 48);
-      ctx.fillText("テクチャレ対象曲: " + (techExclude === "yes" ? "除外する" : "除外しない"), optX, optY + 72);
+      ctx.fillText("Sort: " + (sort === "star" ? "☆5人数" : sort === "rainbow" ? "☆5(虹)人数" : "譜面定数") + " " + (order === "desc" ? "降順" : "昇順"), optX, optY + 40);
+      ctx.fillText("テクチャレ対象曲: " + (techExclude === "yes" ? "除外する" : "除外しない"), optX, optY + 60);
+      ctx.fillText("ソロver.対象曲: " + (soloExclude === "yes" ? "除外する" : "除外しない"), optX, optY + 80);
       ctx.restore();
 
       // テーブルヘッダー
-      const headers = ["Title", "Diff", "Lev(Const)", "☆5Count", "☆5Distr"];
+      const headers = sort === "rainbow"
+        ? ["Title", "Diff", "Lev(Const)", "☆5RCnt", "☆5Distr"]
+        : ["Title", "Diff", "Lev(Const)", "☆5Cnt", "☆5Distr"];
       let x = leftMargin;
       ctx.font = "bold 16px 'Segoe UI',sans-serif";
       ctx.textAlign = "center";
@@ -448,15 +473,25 @@ export default function Database() {
         );
         x += colW[2];
 
-        // ☆5Count
+        // ☆5Cnt or ☆5RCnt
         ctx.fillStyle = "#fff";
         ctx.fillRect(x, headerH + rowH * (r + 1), colW[3], rowH);
         ctx.strokeStyle = "#98c1d9";
         ctx.strokeRect(x, headerH + rowH * (r + 1), colW[3], rowH);
-        ctx.fillStyle = (item.ps5TotalCount == "100" ? "#ee6c4d" : "#293241");
-        ctx.textAlign = "center";
-        ctx.font = "bold 15px 'Segoe UI',sans-serif";
-        ctx.fillText(item.ps5TotalCount ?? "", x + colW[3] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[3] - 8);
+        if (sort === "rainbow") {
+          ctx.fillStyle = (item.ps5RainbowCount == "100" ? "#ee6c4d" : "#293241");
+          ctx.textAlign = "center";
+          ctx.font = "bold 15px 'Segoe UI',sans-serif";
+        } else {
+          ctx.fillStyle = (item.ps5TotalCount == "100" ? "#ee6c4d" : "#293241");
+          ctx.textAlign = "center";
+          ctx.font = "bold 15px 'Segoe UI',sans-serif";
+        }
+        if (sort === "rainbow") {
+          ctx.fillText(item.ps5RainbowCount ?? "", x + colW[3] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[3] - 8);
+        } else {
+          ctx.fillText(item.ps5TotalCount ?? "", x + colW[3] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[3] - 8);
+        }
         x += colW[3];
 
         // ☆5Distr（帯グラフ）
@@ -578,17 +613,71 @@ export default function Database() {
       <div style={{ borderTop: "1px solid #e0e6ed", margin: "1.2em 2em" }} />
       <div style={{ marginBottom: "1.2em" }}>
         <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>ソート順</div>
-        <div style={{ marginBottom: "0.5em" }}>
-          {SORTS.map(opt => renderRadio("sort", opt.value, opt.label, sort, setSort))}
+        <div style={segmentedControlStyle}>
+          {SORTS.map(opt => (
+            <button
+              key={opt.value}
+              style={segmentStyle(sort === opt.value)}
+              onClick={() => setSort(opt.value)}
+              type="button"
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
-        <div style={{ marginBottom: "0.5em" }}>
-          {ORDERS.map(opt => renderRadio("order", opt.value, opt.label, order, setOrder))}
+        <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>降順／昇順</div>
+        <div style={segmentedControlStyle}>
+          {ORDERS.map(opt => (
+            <button
+              key={opt.value}
+              style={segmentStyle(order === opt.value)}
+              onClick={() => setOrder(opt.value)}
+              type="button"
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
         {/* 区切り線 */}
         <div style={{ borderTop: "1px solid #e0e6ed", margin: "1.2em 2em" }} />
         <div>
           <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>テクニカルチャレンジ対象曲を除外</div>
-          {TECH_EXCLUDE.map(opt => renderRadio("tech", opt.value, opt.label, techExclude, setTechExclude))}
+          <div style={segmentedControlStyle}>
+            <button
+              style={segmentStyle(techExclude === "yes")}
+              onClick={() => setTechExclude("yes")}
+              type="button"
+            >
+              する
+            </button>
+            <button
+              style={segmentStyle(techExclude === "no")}
+              onClick={() => setTechExclude("no")}
+              type="button"
+            >
+              しない
+            </button>
+          </div>
+        </div>
+        {/* ソロver.除外 */}
+        <div style={{ marginTop: "0" }}>
+          <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>ソロver.を除外</div>
+          <div style={segmentedControlStyle}>
+            <button
+              style={segmentStyle(soloExclude === "yes")}
+              onClick={() => setSoloExclude("yes")}
+              type="button"
+            >
+              する
+            </button>
+            <button
+              style={segmentStyle(soloExclude === "no")}
+              onClick={() => setSoloExclude("no")}
+              type="button"
+            >
+              しない
+            </button>
+          </div>
         </div>
       </div>
       <button
@@ -662,7 +751,7 @@ export default function Database() {
           <style>{`body { overflow: hidden !important; }`}</style>
           <div style={{
             position: "fixed",
-            top: 0, left: 0, width: "100vw", height: "100vh",
+            top: -50, left: 0, width: "100vw", height: "100vh",
             background: "rgba(41,50,65,0.18)",
             display: "flex",
             alignItems: "center",
@@ -725,17 +814,71 @@ export default function Database() {
               ) : (
                 <div style={{ marginBottom: "1.2em" }}>
                   <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>ソート順</div>
-                  <div style={{ marginBottom: "0.5em" }}>
-                    {SORTS.map(opt => renderRadio("sort", opt.value, opt.label, sort, setSort))}
+                  <div style={segmentedControlStyle}>
+                    {SORTS.map(opt => (
+                      <button
+                        key={opt.value}
+                        style={segmentStyle(sort === opt.value)}
+                        onClick={() => setSort(opt.value)}
+                        type="button"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
                   </div>
-                  <div style={{ marginBottom: "0.5em" }}>
-                    {ORDERS.map(opt => renderRadio("order", opt.value, opt.label, order, setOrder))}
+                  <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>降順／昇順</div>
+                  <div style={segmentedControlStyle}>
+                    {ORDERS.map(opt => (
+                      <button
+                        key={opt.value}
+                        style={segmentStyle(order === opt.value)}
+                        onClick={() => setOrder(opt.value)}
+                        type="button"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
                   </div>
                   {/* 区切り線 */}
                   <div style={{ borderTop: "1px solid #e0e6ed", margin: "1.2em 2em" }} />
                   <div>
                     <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>テクニカルチャレンジ対象曲を除外</div>
-                    {TECH_EXCLUDE.map(opt => renderRadio("tech", opt.value, opt.label, techExclude, setTechExclude))}
+                    <div style={segmentedControlStyle}>
+                      <button
+                        style={segmentStyle(techExclude === "yes")}
+                        onClick={() => setTechExclude("yes")}
+                        type="button"
+                      >
+                        する
+                      </button>
+                      <button
+                        style={segmentStyle(techExclude === "no")}
+                        onClick={() => setTechExclude("no")}
+                        type="button"
+                      >
+                        しない
+                      </button>
+                    </div>
+                  </div>
+                  {/* ソロver.除外 */}
+                  <div style={{ marginTop: "0" }}>
+                    <div style={{ fontWeight: "bold", marginBottom: "0.5em" }}>ソロver.を除外</div>
+                    <div style={segmentedControlStyle}>
+                      <button
+                        style={segmentStyle(soloExclude === "yes")}
+                        onClick={() => setSoloExclude("yes")}
+                        type="button"
+                      >
+                        する
+                      </button>
+                      <button
+                        style={segmentStyle(soloExclude === "no")}
+                        onClick={() => setSoloExclude("no")}
+                        type="button"
+                      >
+                        しない
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

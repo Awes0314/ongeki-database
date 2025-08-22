@@ -113,7 +113,7 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className={styles.header}>
+    <header className={`${styles.header} ${scrolled ? styles.headerScrolled : ""}`}>
       <div
         className={`${styles.logo} ${scrolled ? styles.logoScrolled : ""}`}
         style={{ transition: "background 0.3s" }}

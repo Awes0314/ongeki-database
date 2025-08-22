@@ -9,7 +9,12 @@ type SongRow = {
   chartConst: string;
   ps5Rating: string;
   ps5TotalCount: string;
+  ps4Count: string;
+  ps4Rating: string;
+  ps3Count: string;
+  ps3Rating: string;
   techFlag: string;
+  [key: string]: string; // 追加: string型のインデックスシグネチャ
 };
 
 function toHankaku(str: string) {
@@ -68,7 +73,14 @@ export default function Recommend() {
   const [ratingRange, setRatingRange] = useState<[number, number] | null>(null);
   const [tableHtml, setTableHtml] = useState("");
   const [recommendCount, setRecommendCount] = useState(30); // 選曲数オプション
+  const [resultImgs, setResultImgs] = useState<string[]>([]); // 3画像
+  const [activeTab, setActiveTab] = useState(0); // 0:☆5, 1:☆4, 2:☆3
   const tableRef = useRef<HTMLDivElement>(null);
+  const [outlierExclude, setOutlierExclude] = useState<"する" | "しない">("しない");
+  const [showOutlierModal, setShowOutlierModal] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalRatings, setModalRatings] = useState<number[]>([]);
+  const [modalError, setModalError] = useState("");
 
   // 初期表示時ログ
   useEffect(() => {
@@ -118,6 +130,8 @@ export default function Recommend() {
     setTableHtml("");
     setPlayerName("");
     setRatingRange(null);
+    setResultImgs([]);
+    setActiveTab(0);
 
     // 0文字の場合は「1」をセット
     let inputId = toHankaku(id.trim());
@@ -323,54 +337,48 @@ export default function Recommend() {
       const dataRes = await fetch("/data/data.json");
       const data: SongRow[] = await dataRes.json();
 
-      // 7. おすすめ対象曲抽出
-      let filtered = data.filter((row) => {
-        const ps5Rating = parseFloat(row.ps5Rating);
-        return (
-          !isNaN(ps5Rating) &&
-          ps5Rating >= minRating + 0.050 &&
-          ps5Rating <= maxRating
-        );
-      });
-
-      // 8. テクチャレ除外
-      if (excludeTech === "yes") {
-        filtered = filtered.filter((x) => !x.techFlag || x.techFlag === "0");
-      }
-
-      // 9. Pスコア枠取得済み楽曲除外
-      // starが5のもののみ除外
-      const pscoreIds = pMusics
-        .filter((x: any) => x.star === 5)
-        .map((x: any) => `${x.title}|${x.diff}`);
-
-      filtered = filtered.filter((row) => {
-        let diffKey = "";
-        if (row.difficulty) {
-          const d = row.difficulty;
-          // 先頭3文字を取得し、小文字にする
-          diffKey = d.slice(0, 3).toLowerCase();
+      // 7. 画像生成用: 各☆iごとに抽出
+      function getRecommendList(i: number) {
+        const ratingKey = `ps${i}Rating`;
+        let filtered = data.filter((row) => {
+          const val = parseFloat(row[ratingKey]);
+          return !isNaN(val) && val >= minRating + 0.050 && val <= maxRating;
+        });
+        // テクチャレ除外
+        if (excludeTech === "yes") {
+          filtered = filtered.filter((x) => !x.techFlag || x.techFlag === "0");
         }
-        return !pscoreIds.includes(`${row.musicName}|${diffKey}`);
-      });
+        // x.star値で除外
+        const pscoreIds = pMusics
+          .filter((x: any) => x.star >= i)
+          .map((x: any) => `${x.title}|${x.diff}`);
 
-      // 10. ソロver除外
-      filtered = filtered.filter(
-        (row) => !(row.musicName && row.musicName.includes("ソロver"))
-      );
-
-      // 11. ソート
-      filtered.sort((a, b) => {
-        const starA = parseInt(a.ps5TotalCount) || 0;
-        const starB = parseInt(b.ps5TotalCount) || 0;
-        if (starA !== starB) return starB - starA;
-        const constA = parseFloat(a.chartConst) || 0;
-        const constB = parseFloat(b.chartConst) || 0;
-        return constB - constA;
-      });
-
-      // 12. 選曲数で抽出
-      const finalList = filtered.slice(0, recommendCount);
+        filtered = filtered.filter((row) => {
+          let diffKey = "";
+          if (row.difficulty) {
+            const d = row.difficulty;
+            // 先頭3文字を取得し、小文字にする
+            diffKey = d.slice(0, 3).toLowerCase();
+          }
+          return !pscoreIds.includes(`${row.musicName}|${diffKey}`);
+        });
+        
+        // ソロver除外
+        filtered = filtered.filter(
+          (row) => !(row.musicName && row.musicName.includes("ソロver"))
+        );
+        // ソート
+        filtered.sort((a, b) => {
+          const starA = parseInt(a.ps5TotalCount) || 0;
+          const starB = parseInt(b.ps5TotalCount) || 0;
+          if (starA !== starB) return starB - starA;
+          const constA = parseFloat(a.chartConst) || 0;
+          const constB = parseFloat(b.chartConst) || 0;
+          return constB - constA;
+        });
+        // 選曲数で抽出
+        return filtered.slice(0, recommendCount);
+      }
 
       // 13. ローディング: 画像を生成中...
       setTableHtml(`
@@ -382,240 +390,256 @@ export default function Recommend() {
 
       // 14. 画像生成
       setTimeout(async () => {
-        // canvas生成
-        const rowH = 28; // databaseと同じ
-        const headerH = 120;
-        const leftMargin = 18;
-        const rightMargin = 18;
-        // カラム幅割合: 1:6:2:2:1:2
-        const colRatio = [1, 6, 2, 2, 1, 2];
-        const totalRatio = colRatio.reduce((a, b) => a + b, 0);
-        const tableW = 900;
-        const colW = colRatio.map(r => Math.round((tableW - leftMargin - rightMargin) * r / totalRatio));
-        const canvasW = tableW;
-        const canvasH = headerH + rowH * finalList.length + 60;
-        const canvas = document.createElement("canvas");
-        canvas.width = canvasW;
-        canvas.height = canvasH;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+        const lists = [
+          { title: "☆5おすすめ楽曲", data: getRecommendList(5), ratingKey: "ps5Rating" },
+          { title: "☆4おすすめ楽曲", data: getRecommendList(4), ratingKey: "ps4Rating" },
+          { title: "☆3おすすめ楽曲", data: getRecommendList(3), ratingKey: "ps3Rating" },
+        ];
+        const imgs: string[] = [];
+        for (let i = 0; i < lists.length; ++i) {
+          const { title, data: finalList, ratingKey } = lists[i];
+          // canvas生成
+          const rowH = 28; // databaseと同じ
+          const headerH = 120;
+          const leftMargin = 18;
+          const rightMargin = 18;
+          // カラム幅割合: 1:6:2:2:1:2
+          const colRatio = [1, 6, 2, 2, 1, 2];
+          const totalRatio = colRatio.reduce((a, b) => a + b, 0);
+          const tableW = 900;
+          const colW = colRatio.map(r => Math.round((tableW - leftMargin - rightMargin) * r / totalRatio));
+          const canvasW = tableW;
+          const canvasH = headerH + rowH * finalList.length + 60;
+          const canvas = document.createElement("canvas");
+          canvas.width = canvasW;
+          canvas.height = canvasH;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) continue;
 
-        // 背景
-        ctx.fillStyle = "#e0fbfc";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+          // 背景
+          ctx.fillStyle = "#e0fbfc";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // サイトロゴ描画（左上端）
-        const logoX = leftMargin;
-        const logoY = 18;
-        const logoW = 130;
-        const logoH = 44;
-        // 背景（丸みあり）
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(logoX + 8, logoY);
-        ctx.lineTo(logoX + logoW - 8, logoY);
-        ctx.quadraticCurveTo(logoX + logoW, logoY, logoX + logoW, logoY + 8);
-        ctx.lineTo(logoX + logoW, logoY + logoH - 8);
-        ctx.quadraticCurveTo(logoX + logoW, logoY + logoH, logoX + logoW - 8, logoY + logoH);
-        ctx.lineTo(logoX + 8, logoY + logoH);
-        ctx.quadraticCurveTo(logoX, logoY + logoH, logoX, logoY + logoH - 8);
-        ctx.lineTo(logoX, logoY + 8);
-        ctx.quadraticCurveTo(logoX, logoY, logoX + 8, logoY);
-        ctx.closePath();
-        ctx.fillStyle = "#3d5a80";
-        ctx.shadowColor = "#29324133";
-        ctx.shadowBlur = 4;
-        ctx.fill();
-        ctx.restore();
-
-        // favicon.ico描画
-        try {
-          const favicon = new window.Image();
-          favicon.src = "/favicon.ico";
-          await new Promise<void>((resolve) => {
-            favicon.onload = () => resolve();
-            favicon.onerror = () => resolve();
-          });
-          ctx.drawImage(favicon, logoX + 6, logoY + 6, 32, 32);
-        } catch {}
-        // テキスト
-        ctx.save();
-        ctx.font = "bold 15px 'Segoe UI',sans-serif";
-        ctx.fillStyle = "#fff";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        ctx.shadowColor = "rgba(41,50,65,0.10)";
-        ctx.shadowBlur = 0;
-        ctx.fillText("Pongeki", logoX + 44 + 10, logoY + logoH / 2);
-        ctx.restore();
-
-        // 上端ボーダー
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(canvasW, 0);
-        ctx.lineWidth = 12;
-        ctx.strokeStyle = "#ee6c4d";
-        ctx.moveTo(0, 0);
-        ctx.lineTo(Math.floor(canvasW * 0.3), 0);
-        ctx.stroke();
-        ctx.strokeStyle = "#3d5a80";
-        ctx.moveTo(Math.floor(canvasW * 0.3), 0);
-        ctx.lineTo(canvasW, 0);
-        ctx.stroke();
-        ctx.restore();
-
-        // 下端ボーダー
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(0, canvasH - 1);
-        ctx.lineTo(canvasW, canvasH - 1);
-        ctx.lineWidth = 12;
-        ctx.strokeStyle = "#ee6c4d";
-        ctx.moveTo(0, canvasH - 1);
-        ctx.lineTo(Math.floor(canvasW * 0.3), canvasH - 1);
-        ctx.stroke();
-        ctx.strokeStyle = "#3d5a80";
-        ctx.moveTo(Math.floor(canvasW * 0.3), canvasH - 1);
-        ctx.lineTo(canvasW, canvasH - 1);
-        ctx.stroke();
-        ctx.restore();
-
-        // オプション表示（右上）
-        ctx.save();
-        ctx.font = "15px 'Segoe UI',sans-serif";
-        ctx.textAlign = "right";
-        ctx.fillStyle = "#293241";
-        const optX = canvasW - 24;
-        let optY = 26;
-        ctx.fillText(new Date().toLocaleString("ja-JP", { hour12: false }), optX, optY);
-        ctx.fillText("Player: " + playerName, optX, optY + 24);
-        ctx.fillText("Rating: " + pRating, optX, optY + 48);
-        ctx.fillText("Opt.: テクチャレ" + (excludeTech === "yes" ? "除外する" : "除外しない") + " / 選曲数 " + recommendCount, optX, optY + 72);
-        ctx.restore();
-
-        // ヘッダー
-        const headers = ["#", "Title", "Diff", "Lev(Const)", "☆5Count", "Expected Rising"];
-        let x = leftMargin;
-        ctx.font = "bold 16px 'Segoe UI',sans-serif"; // databaseと同じ
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        for (let c = 0; c < headers.length; ++c) {
+          // サイトロゴ描画（左上端）
+          const logoX = leftMargin;
+          const logoY = 18;
+          const logoW = 130;
+          const logoH = 44;
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(logoX + 8, logoY);
+          ctx.lineTo(logoX + logoW - 8, logoY);
+          ctx.quadraticCurveTo(logoX + logoW, logoY, logoX + logoW, logoY + 8);
+          ctx.lineTo(logoX + logoW, logoY + logoH - 8);
+          ctx.quadraticCurveTo(logoX + logoW, logoY + logoH, logoX + logoW - 8, logoY + logoH);
+          ctx.lineTo(logoX + 8, logoY + logoH);
+          ctx.quadraticCurveTo(logoX, logoY + logoH, logoX, logoY + logoH - 8);
+          ctx.lineTo(logoX, logoY + 8);
+          ctx.quadraticCurveTo(logoX, logoY, logoX + 8, logoY);
+          ctx.closePath();
           ctx.fillStyle = "#3d5a80";
-          ctx.fillRect(x, headerH, colW[c], rowH);
-          ctx.strokeStyle = "#98c1d9";
-          ctx.strokeRect(x, headerH, colW[c], rowH);
+          ctx.shadowColor = "#29324133";
+          ctx.shadowBlur = 4;
+          ctx.fill();
+          ctx.restore();
+
+          // favicon.ico描画
+          try {
+            const favicon = new window.Image();
+            favicon.src = "/favicon.ico";
+            await new Promise<void>((resolve) => {
+              favicon.onload = () => resolve();
+              favicon.onerror = () => resolve();
+            });
+            ctx.drawImage(favicon, logoX + 6, logoY + 6, 32, 32);
+          } catch {}
+          // テキスト
+          ctx.save();
+          ctx.font = "bold 15px 'Segoe UI',sans-serif";
           ctx.fillStyle = "#fff";
-          ctx.fillText(headers[c], x + colW[c] / 2, headerH + rowH / 2, colW[c] - 8);
-          x += colW[c];
-        }
-
-        // 本体
-        ctx.font = "15px 'Segoe UI',sans-serif"; // databaseと同じ
-        for (let r = 0; r < finalList.length; ++r) {
-          let x = leftMargin;
-          const item = finalList[r];
-
-          // 順位
-          ctx.fillStyle = "#fff";
-          ctx.fillRect(x, headerH + rowH * (r + 1), colW[0], rowH);
-          ctx.strokeStyle = "#98c1d9";
-          ctx.strokeRect(x, headerH + rowH * (r + 1), colW[0], rowH);
-          ctx.fillStyle = "#293241";
-          ctx.textAlign = "center";
-          ctx.fillText(String(r + 1), x + colW[0] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[0] - 8);
-          x += colW[0];
-
-          // Title（色分け）
-          let bgColor = "#fff";
-          switch (item.difficulty) {
-            case "MASTER": bgColor = "#f3e6fa"; break;
-            case "EXPERT": bgColor = "#fde6f3"; break;
-            case "ADVANCED": bgColor = "#fff2e0"; break;
-            case "BASIC": bgColor = "#e6fae6"; break;
-            case "LUNATIC": bgColor = "#f3f3f3"; break;
-          }
-          ctx.fillStyle = bgColor;
-          ctx.fillRect(x, headerH + rowH * (r + 1), colW[1], rowH);
-          ctx.strokeStyle = "#98c1d9";
-          ctx.strokeRect(x, headerH + rowH * (r + 1), colW[1], rowH);
-          ctx.fillStyle = "#293241";
           ctx.textAlign = "left";
-          ctx.font = "bold 15px 'Segoe UI',sans-serif"; // databaseと同じ
-          ctx.fillText(item.musicName ?? "", x + 12, headerH + rowH * (r + 1) + rowH / 2, colW[1] - 24);
-          x += colW[1];
+          ctx.textBaseline = "middle";
+          ctx.shadowColor = "rgba(41,50,65,0.10)";
+          ctx.shadowBlur = 0;
+          ctx.fillText("Pongeki", logoX + 44 + 10, logoY + logoH / 2);
+          ctx.restore();
 
-          // Diff（色分け）
-          let diffColor = "#293241";
-          switch (item.difficulty) {
-            case "MASTER": diffColor = "#a259e6"; break;
-            case "EXPERT": diffColor = "#e0408a"; break;
-            case "ADVANCED": diffColor = "#ff9800"; break;
-            case "BASIC": diffColor = "#7ed957"; break;
-            case "LUNATIC": diffColor = "#222"; break;
-          }
-          ctx.fillStyle = "#fff";
-          ctx.fillRect(x, headerH + rowH * (r + 1), colW[2], rowH);
-          ctx.strokeStyle = "#98c1d9";
-          ctx.strokeRect(x, headerH + rowH * (r + 1), colW[2], rowH);
-          ctx.fillStyle = diffColor;
+          // 上端ボーダー
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(canvasW, 0);
+          ctx.lineWidth = 12;
+          ctx.strokeStyle = "#ee6c4d";
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.floor(canvasW * 0.3), 0);
+          ctx.stroke();
+          ctx.strokeStyle = "#3d5a80";
+          ctx.moveTo(Math.floor(canvasW * 0.3), 0);
+          ctx.lineTo(canvasW, 0);
+          ctx.stroke();
+          ctx.restore();
+
+          // 下端ボーダー
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(0, canvasH - 1);
+          ctx.lineTo(canvasW, canvasH - 1);
+          ctx.lineWidth = 12;
+          ctx.strokeStyle = "#ee6c4d";
+          ctx.moveTo(0, canvasH - 1);
+          ctx.lineTo(Math.floor(canvasW * 0.3), canvasH - 1);
+          ctx.stroke();
+          ctx.strokeStyle = "#3d5a80";
+          ctx.moveTo(Math.floor(canvasW * 0.3), canvasH - 1);
+          ctx.lineTo(canvasW, canvasH - 1);
+          ctx.stroke();
+          ctx.restore();
+
+          // タイトル（database画像と同じ位置・デザイン）
+          ctx.font = "bold 28px 'Segoe UI',sans-serif";
           ctx.textAlign = "center";
-          ctx.font = "bold 15px 'Segoe UI',sans-serif"; // databaseと同じ
-          ctx.fillText(item.difficulty ?? "", x + colW[2] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[2] - 8);
-          x += colW[2];
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "#3d5a80";
+          ctx.fillText(title, leftMargin + (tableW - leftMargin - rightMargin) / 2, headerH / 2);
 
-          // Lev(Const)
-          ctx.fillStyle = "#fff";
-          ctx.fillRect(x, headerH + rowH * (r + 1), colW[3], rowH);
-          ctx.strokeStyle = "#98c1d9";
-          ctx.strokeRect(x, headerH + rowH * (r + 1), colW[3], rowH);
+          // オプション表示（右上）
+          ctx.save();
+          ctx.font = "15px 'Segoe UI',sans-serif";
+          ctx.textAlign = "right";
           ctx.fillStyle = "#293241";
-          ctx.textAlign = "center";
-          ctx.font = "15px 'Segoe UI',sans-serif"; // databaseと同じ
-          let chartConstDisp = "";
-          if (item.chartConst !== undefined && item.chartConst !== null && item.chartConst !== "") {
-            let num = Number(item.chartConst);
-            chartConstDisp = isNaN(num) ? String(item.chartConst) : num.toFixed(1);
-          }
-          ctx.fillText(
-            `${item.level ?? ""}${chartConstDisp ? ` (${chartConstDisp})` : ""}`,
-            x + colW[3] / 2,
-            headerH + rowH * (r + 1) + rowH / 2,
-            colW[3] - 8
-          );
-          x += colW[3];
+          const optX = canvasW - 24;
+          let optY = 26;
+          ctx.fillText(new Date().toLocaleString("ja-JP", { hour12: false }), optX, optY);
+          ctx.fillText("Player: " + playerName, optX, optY + 24);
+          ctx.fillText("Rating: " + pRating, optX, optY + 48);
+          ctx.fillText("Opt.: テクチャレ" + (excludeTech === "yes" ? "除外する" : "除外しない") + " / 選曲数 " + recommendCount, optX, optY + 72);
+          ctx.restore();
 
-          // ☆5Count
-          ctx.fillStyle = "#fff";
-          ctx.fillRect(x, headerH + rowH * (r + 1), colW[4], rowH);
-          ctx.strokeStyle = "#98c1d9";
-          ctx.strokeRect(x, headerH + rowH * (r + 1), colW[4], rowH);
-          ctx.fillStyle = "#293241";
+          // ヘッダー
+          const headers = ["#", "Title", "Diff", "Lev(Const)", "☆5Cnt", "Expected Rising"];
+          let x = leftMargin;
+          ctx.font = "bold 16px 'Segoe UI',sans-serif";
           ctx.textAlign = "center";
-          ctx.font = "bold 15px 'Segoe UI',sans-serif"; // databaseと同じ
-          ctx.fillText(item.ps5TotalCount ?? "", x + colW[4] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[4] - 8);
-          x += colW[4];
-
-          // Expected Rising
-          ctx.fillStyle = "#fff";
-          ctx.fillRect(x, headerH + rowH * (r + 1), colW[5], rowH);
-          ctx.strokeStyle = "#98c1d9";
-          ctx.strokeRect(x, headerH + rowH * (r + 1), colW[5], rowH);
-          ctx.fillStyle = "#293241";
-          ctx.textAlign = "center";
-          // 計算
-          let rising = "+0.000";
-          if (item.ps5Rating && !isNaN(Number(item.ps5Rating))) {
-            const val = Math.round(((Number(item.ps5Rating) - minRating) / 50) * 10000) / 10000;
-            rising = "+" + val.toFixed(3);
+          ctx.textBaseline = "middle";
+          for (let c = 0; c < headers.length; ++c) {
+            ctx.fillStyle = "#3d5a80";
+            ctx.fillRect(x, headerH, colW[c], rowH);
+            ctx.strokeStyle = "#98c1d9";
+            ctx.strokeRect(x, headerH, colW[c], rowH);
+            ctx.fillStyle = "#fff";
+            ctx.textAlign = "center";
+            ctx.font = "bold 16px 'Segoe UI',sans-serif";
+            ctx.fillText(headers[c], x + colW[c] / 2, headerH + rowH / 2, colW[c] - 8);
+            x += colW[c];
           }
-          ctx.fillText(rising, x + colW[5] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[5] - 8);
+
+          // 本体
+          ctx.font = "15px 'Segoe UI',sans-serif";
+          for (let r = 0; r < finalList.length; ++r) {
+            let x = leftMargin;
+            const item = finalList[r];
+
+            // 順位
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(x, headerH + rowH * (r + 1), colW[0], rowH);
+            ctx.strokeStyle = "#98c1d9";
+            ctx.strokeRect(x, headerH + rowH * (r + 1), colW[0], rowH);
+            ctx.fillStyle = "#293241";
+            ctx.textAlign = "center";
+            ctx.fillText(String(r + 1), x + colW[0] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[0] - 8);
+            x += colW[0];
+
+            // Title（色分け）
+            let bgColor = "#fff";
+            switch (item.difficulty) {
+              case "MASTER": bgColor = "#f3e6fa"; break;
+              case "EXPERT": bgColor = "#fde6f3"; break;
+              case "ADVANCED": bgColor = "#fff2e0"; break;
+              case "BASIC": bgColor = "#e6fae6"; break;
+              case "LUNATIC": bgColor = "#f3f3f3"; break;
+            }
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(x, headerH + rowH * (r + 1), colW[1], rowH);
+            ctx.strokeStyle = "#98c1d9";
+            ctx.strokeRect(x, headerH + rowH * (r + 1), colW[1], rowH);
+            ctx.fillStyle = "#293241";
+            ctx.textAlign = "left";
+            ctx.font = "bold 15px 'Segoe UI',sans-serif";
+            ctx.fillText(item.musicName ?? "", x + 12, headerH + rowH * (r + 1) + rowH / 2, colW[1] - 24);
+            x += colW[1];
+
+            // Diff（色分け）
+            let diffColor = "#293241";
+            switch (item.difficulty) {
+              case "MASTER": diffColor = "#a259e6"; break;
+              case "EXPERT": diffColor = "#e0408a"; break;
+              case "ADVANCED": diffColor = "#ff9800"; break;
+              case "BASIC": diffColor = "#7ed957"; break;
+              case "LUNATIC": diffColor = "#222"; break;
+            }
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(x, headerH + rowH * (r + 1), colW[2], rowH);
+            ctx.strokeStyle = "#98c1d9";
+            ctx.strokeRect(x, headerH + rowH * (r + 1), colW[2], rowH);
+            ctx.fillStyle = diffColor;
+            ctx.textAlign = "center";
+            ctx.font = "bold 15px 'Segoe UI',sans-serif";
+            ctx.fillText(item.difficulty ?? "", x + colW[2] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[2] - 8);
+            x += colW[2];
+
+            // Lev(Const)
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(x, headerH + rowH * (r + 1), colW[3], rowH);
+            ctx.strokeStyle = "#98c1d9";
+            ctx.strokeRect(x, headerH + rowH * (r + 1), colW[3], rowH);
+            ctx.fillStyle = "#293241";
+            ctx.textAlign = "center";
+            ctx.font = "15px 'Segoe UI',sans-serif";
+            let chartConstDisp = "";
+            if (item.chartConst !== undefined && item.chartConst !== null && item.chartConst !== "") {
+              let num = Number(item.chartConst);
+              chartConstDisp = isNaN(num) ? String(item.chartConst) : num.toFixed(1);
+            }
+            ctx.fillText(
+              `${item.level ?? ""}${chartConstDisp ? ` (${chartConstDisp})` : ""}`,
+              x + colW[3] / 2,
+              headerH + rowH * (r + 1) + rowH / 2,
+              colW[3] - 8
+            );
+            x += colW[3];
+
+            // ☆5Count
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(x, headerH + rowH * (r + 1), colW[4], rowH);
+            ctx.strokeStyle = "#98c1d9";
+            ctx.strokeRect(x, headerH + rowH * (r + 1), colW[4], rowH);
+            ctx.fillStyle = "#293241";
+            ctx.textAlign = "center";
+            ctx.font = "bold 15px 'Segoe UI',sans-serif";
+            ctx.fillText(item.ps5TotalCount ?? "", x + colW[4] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[4] - 8);
+            x += colW[4];
+
+            // Expected Rising（ps{i}Rating使用）
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(x, headerH + rowH * (r + 1), colW[5], rowH);
+            ctx.strokeStyle = "#98c1d9";
+            ctx.strokeRect(x, headerH + rowH * (r + 1), colW[5], rowH);
+            ctx.fillStyle = "#293241";
+            ctx.textAlign = "center";
+            let rising = "+0.000";
+            if (item[ratingKey] && !isNaN(Number(item[ratingKey]))) {
+              const val = Math.round(((Number(item[ratingKey]) - minRating) / 50) * 10000) / 10000;
+              rising = "+" + val.toFixed(3);
+            }
+            ctx.fillText(rising, x + colW[5] / 2, headerH + rowH * (r + 1) + rowH / 2, colW[5] - 8);
+          }
+          imgs.push(canvas.toDataURL("image/png"));
         }
-
-        setResultImg(canvas.toDataURL("image/png"));
+        setResultImgs(imgs);
         setTableHtml("");
         setLoading(false);
-      }, 400);
+      });
     } catch (e) {
       setError("情報の取得に失敗しました。");
       setLoading(false);
@@ -637,7 +661,7 @@ export default function Recommend() {
   }
 
   function handleSave() {
-    if (!resultImg) return;
+    if (!resultImgs[activeTab]) return;
 
     // ログ送信（非同期で投げっぱなしOK）
     let userId = "";
@@ -667,7 +691,7 @@ export default function Recommend() {
     });
 
     try {
-      const file = dataUrlToFile(resultImg, "ongeki_recommend.png");
+      const file = dataUrlToFile(resultImgs[activeTab], "ongeki_recommend.png");
 
       // 共有が使えるかどうかチェック
       const canUseShare = typeof navigator.canShare === "function" &&
@@ -684,7 +708,7 @@ export default function Recommend() {
       } else {
         // fallback: 通常の画像ダウンロード
         const a = document.createElement("a");
-        a.href = resultImg;
+        a.href = resultImgs[activeTab];
         a.download = "ongeki_recommend.png";
         document.body.appendChild(a);
         a.click();
@@ -718,6 +742,29 @@ export default function Recommend() {
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+
+  // 分割ボタン用スタイル
+  const segmentedControlStyle = {
+    display: "inline-flex",
+    borderRadius: "999px",
+    overflow: "hidden",
+    border: "1.5px solid #98c1d9",
+    background: "#e0fbfc",
+    gap: "0px"
+  };
+  const segmentStyle = (selected: boolean) => ({
+    padding: "8px 20px",
+    background: selected ? "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)" : "#f3f6fa",
+    color: selected ? "#fff" : "#3d5a80",
+    border: "none",
+    fontWeight: "bold",
+    cursor: "pointer",
+    fontSize: "1.05em",
+    transition: "background 0.2s",
+    minWidth: "unset",
+    flex: "unset",
+  });
+
 
   return (
     <>
@@ -866,51 +913,22 @@ export default function Recommend() {
               justifyContent: "center",
               height: "100%",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <label style={{
-                  display: "inline-block",
-                  padding: "6px 16px",
-                  borderRadius: 20,
-                  fontWeight: "bold",
-                  color: excludeTech === "yes" ? "#fff" : "#3d5a80",
-                  background: excludeTech === "yes"
-                    ? "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)"
-                    : "#f3f6fa",
-                  border: "1.5px solid #98c1d9",
-                  cursor: "pointer"
-                }}>
-                  <input
-                    type="radio"
-                    name="exclude-tech"
-                    value="yes"
-                    checked={excludeTech === "yes"}
-                    onChange={() => setExcludeTech("yes")}
-                    style={{ display: "none" }}
-                  />
+              {/* テクチャレ除外分割ボタン */}
+              <div style={segmentedControlStyle}>
+                <button
+                  style={segmentStyle(excludeTech === "yes")}
+                  onClick={() => setExcludeTech("yes")}
+                  type="button"
+                >
                   する
-                </label>
-                <label style={{
-                  display: "inline-block",
-                  padding: "6px 16px",
-                  borderRadius: 20,
-                  fontWeight: "bold",
-                  color: excludeTech === "no" ? "#fff" : "#3d5a80",
-                  background: excludeTech === "no"
-                    ? "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)"
-                    : "#f3f6fa",
-                  border: "1.5px solid #98c1d9",
-                  cursor: "pointer"
-                }}>
-                  <input
-                    type="radio"
-                    name="exclude-tech"
-                    value="no"
-                    checked={excludeTech === "no"}
-                    onChange={() => setExcludeTech("no")}
-                    style={{ display: "none" }}
-                  />
+                </button>
+                <button
+                  style={segmentStyle(excludeTech === "no")}
+                  onClick={() => setExcludeTech("no")}
+                  type="button"
+                >
                   しない
-                </label>
+                </button>
               </div>
             </div>
           </div>
@@ -1022,8 +1040,39 @@ export default function Recommend() {
           <div style={{ color: "#ee6c4d", marginBottom: 16, fontWeight: "bold" }}>{error}</div>
         )}
         <div ref={tableRef} dangerouslySetInnerHTML={{ __html: tableHtml }} />
-        {resultImg && (
+        {resultImgs.length > 0 && (
           <div style={{ textAlign: "center", margin: "2em 0" }}>
+            {/* タブ切り替え */}
+            <div style={{
+              display: "inline-flex",
+              borderRadius: "999px",
+              overflow: "hidden",
+              border: "1.5px solid #98c1d9",
+              background: "#e0fbfc",
+              marginBottom: "1.5em",
+            }}>
+              {["☆5", "☆4", "☆3"].map((tab, idx) => (
+                <button
+                  key={tab}
+                  style={{
+                    padding: "8px 24px",
+                    background: activeTab === idx ? "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)" : "#e0fbfc",
+                    color: activeTab === idx ? "#fff" : "#3d5a80",
+                    border: "none",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    fontSize: "1.05em",
+                    transition: "background 0.2s",
+                    minWidth: "unset",
+                    flex: "unset",
+                  }}
+                  onClick={() => setActiveTab(idx)}
+                  type="button"
+                >
+                  {tab}
+                </button>
+              ))}
+            </div><br />
             <button
               onClick={handleSave}
               style={{
@@ -1043,7 +1092,7 @@ export default function Recommend() {
             </button>
             <br />
             <img
-              src={resultImg}
+              src={resultImgs[activeTab]}
               alt="おすすめ楽曲表"
               style={{
                 maxWidth: "100%",
@@ -1091,10 +1140,10 @@ export default function Recommend() {
           ・新曲及び10+以下のレベルの譜面定数に関して、情報が不足している場合正しく選出されない可能性があります。
           <br />
           <b>【選出仕様】</b><br />
-          ・現在のPスコア枠を参考に、「☆5獲得でPスコア枠更新が見込める楽曲」を選出します。<br />
-          ・おすすめ上位の楽曲は、☆5獲得人数が多い楽曲を優先して選出します。<br />
+          ・現在のPスコア枠を参考に、「☆5・☆4・☆3獲得でPスコア枠更新が見込める楽曲」を選出します。<br />
+          ・おすすめ上位の楽曲は、☆5・☆4・☆3獲得人数が多い楽曲を優先して選出します。<br />
           ・オプション項目にて、テクニカルチャレンジ対象曲となったことのある楽曲を除外することができます。<br />
-          ・「Expected Rising」は、☆5獲得時に見込める上昇レーティング想定値です。
+          ・「Expected Rising」は、☆5・☆4・☆3獲得時に見込める上昇レーティング想定値です。
         </div>
       </main>
       <style>{`
