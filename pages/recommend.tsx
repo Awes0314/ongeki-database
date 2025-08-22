@@ -227,12 +227,12 @@ export default function Recommend() {
           const tableMatch = statHtml.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/);
           if (tableMatch) {
             const tableHtml = tableMatch[1];
-            const trMatch = tableHtml.match(/<tr>([\s\S]*?)<\/tr>/);
+            const trMatch = tableHtml.match(/<td>プラチナ([\s\S]*?)<\/tr>/);
             if (trMatch) {
               const trHtml = trMatch[1];
               const tdMatches = trHtml.match(/<td[^>]*>([\s\S]*?)<\/td>/g);
               if (tdMatches && tdMatches.length >= 2) {
-                pRating = tdMatches[1].replace(/<[^>]+>/g, "").trim();
+                pRating = tdMatches[0].replace(/<[^>]+>/g, "").trim();
               }
             }
           }
