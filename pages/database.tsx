@@ -956,6 +956,9 @@ export default function Database() {
         {errorMsg && <div style={{ color: "#ee6c4d", margin: "1.5em 0" }}>{errorMsg}</div>}
         {tableImageUrl && (
           <div style={{ margin: "2em 0", overflowX: "auto" }}>
+            <div style={{ color: "#293241", textAlign: 'center', margin: '0 30px 30px' }}>
+              ※ オンゲキアドベンチャー解禁曲は集計が遅れる場合があります。
+            </div>
             <img src={tableImageUrl} alt="一覧表" style={{ maxWidth: "100%" }} />
           </div>
         )}
