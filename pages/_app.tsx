@@ -60,19 +60,6 @@ export default function App({ Component, pageProps }: AppProps) {
         <link rel="icon" href="/favicon.ico" />
         <link rel="canonical" href="https://ongeki-db.awesomes.jp/" />
       </Head>
-      {/* Google Analytics */}
-      <Script
-        src="https://www.googletagmanager.com/gtag/js?id=G-72VC0C4XB2"
-        strategy="afterInteractive"
-      />
-      <Script id="ga-init" strategy="afterInteractive">
-        {`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-72VC0C4XB2', { page_path: window.location.pathname });
-        `}
-      </Script>
       <Component {...pageProps} />
     </>
   );
