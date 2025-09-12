@@ -85,6 +85,13 @@ export default function Home() {
               imageSrc="/index_ranking.png"
               onClick={() => handleCardClick("理論値ランキングリンク")}
             />
+            <Card
+              href="/map"
+              title="アドベンチャーマップ"
+              description="オンゲキアドベンチャーマップの情報を確認できます。"
+              imageSrc="/index_map.png"
+              onClick={() => handleCardClick("アドベンチャーマップリンク")}
+            />
           </div>
           <div className={styles.aboutLink}>
             <Link

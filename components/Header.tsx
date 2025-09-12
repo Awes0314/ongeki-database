@@ -8,6 +8,7 @@ const menuLinks = [
   { href: "/database", label: "☆獲得人数一覧" },
   { href: "/recommend", label: "Pスコア枠おすすめ曲選出" },
   { href: "/ranking", label: "理論値ランキング" },
+  { href: "/map", label: "アドベンチャーマップ" },
   { href: "/about", label: "このサイトについて" },
 ];
 

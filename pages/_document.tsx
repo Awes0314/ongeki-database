@@ -7,7 +7,7 @@ export default function Document() {
       <Head>
         {/* Google Analytics */}
         <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-72VC0C4XB2"
+          src="https://www.googletagmanager.com/gtag/js?id=G-TFCKF21GWZ"
           strategy="beforeInteractive"
         />
         <Script id="ga-init" strategy="beforeInteractive">
@@ -15,7 +15,7 @@ export default function Document() {
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
-            gtag('config', 'G-72VC0C4XB2', { page_path: window.location.pathname });
+            gtag('config', 'G-TFCKF21GWZ', { page_path: window.location.pathname });
           `}
         </Script>
       </Head>

@@ -40,12 +40,30 @@ a {
   box-sizing: border-box;
 }
 
+/* mapページ用canvas中央配置・レスポンシブ */
+#map-canvas {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  box-shadow: 0 2px 12px rgba(41,50,65,0.08);
+  border-radius: 12px;
+  background: #e0fbfc;
+}
+
 @media (max-width: 480px) {
   html { font-size: 15px; }
+  #map-canvas {
+    width: 98vw !important;
+    height: auto !important;
+  }
 }
 
 @media (min-width: 481px) and (max-width: 768px) {
   html { font-size: 16px; }
+  #map-canvas {
+    width: 95vw !important;
+    height: auto !important;
+  }
 }
 
 @media (min-width: 769px) {

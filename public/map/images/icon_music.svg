@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <circle cx="32" cy="32" r="28" fill="#fff" stroke="#000" stroke-width="4" />
+  <g>
+    <!-- 八分音符本体（青色） -->
+    <rect x="33" y="12" width="2" height="36" rx="1" fill="#006effff" />
+    <ellipse cx="27" cy="47" rx="8" ry="6" fill="#006effff" />
+    <!-- 八分音符旗（塗りつぶし） -->
+    <path d="M34 12 Q60 26 40 44 Q50 30 34 24 Z" fill="#006effff" />
+  </g>
+</svg>

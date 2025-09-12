@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- 鍵の持ち手部分（円＋中心穴） -->
+  <circle cx="48" cy="16" r="12" fill="#0000ffff" stroke="#000" stroke-width="4" />
+  <g transform="rotate(-45 53 53)">
+    <!-- 鍵の本体（棒） -->
+    <rect x="24" y="18" width="40" height="10" rx="2" fill="#000" />
+    <!-- 鍵の爪部分（左下） -->
+    <rect x="30" y="22" width="6" height="20" rx="2" fill="#000" />
+    <rect x="40" y="22" width="6" height="20" rx="2" fill="#000" />
+  </g>
+</svg>
