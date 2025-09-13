@@ -64,6 +64,8 @@ function generateUUID() {
 }
 
 export default function Recommend() {
+  // 棒グラフスライダーインデックス（モーダル用）
+  const [barSliderIdx, setBarSliderIdx] = useState(0);
   const [id, setId] = useState("");
   const [excludeTech, setExcludeTech] = useState("no");
   const [loading, setLoading] = useState(false);
@@ -327,11 +329,18 @@ export default function Recommend() {
       `);
 
       // 5. rating範囲
-      const ratings = pMusics
-        .map((r: any) => parseFloat(r.rating))
-        .filter((r: any) => !isNaN(r));
-      const minRating = Math.min(...ratings);
-      const maxRating = Math.max(...ratings);
+      let minRating: number;
+      let maxRating: number;
+      if (ratingRange) {
+        minRating = ratingRange[0];
+        maxRating = ratingRange[1];
+      } else {
+        const ratings = pMusics
+          .map((r: any) => parseFloat(r.rating))
+          .filter((r: any) => !isNaN(r));
+        minRating = Math.min(...ratings);
+        maxRating = Math.max(...ratings);
+      }
 
       // 6. data.json取得
       const dataRes = await fetch("/data/data.json");
@@ -766,9 +775,248 @@ export default function Recommend() {
   });
 
 
+  // 外れ値除外モーダル表示ハンドラ
+  async function handleOutlierExclude() {
+    setShowOutlierModal(true);
+    setModalLoading(true);
+    setModalError("");
+    setModalRatings([]);
+    // OngekiScoreLogからPスコア枠一覧取得
+    try {
+      let inputId = toHankaku(id.trim());
+      if (inputId.length === 0) inputId = "1";
+      const res = await fetch(`/api/scorelog?id=${inputId}`);
+      const { html } = await res.json();
+      // Pスコア枠情報抽出
+      let pMusics: any[] = [];
+      try {
+        const articleMatch = html.match(/<article id="rating_platinum" class="box">([\s\S]*?)<\/table>/);
+        if (articleMatch) {
+          const tableHtml = articleMatch[1] + "</table>";
+          // テーブル行抽出
+          const trRegex = /<tr>([\s\S]*?)<\/tr>/g;
+          let match;
+          while ((match = trRegex.exec(tableHtml)) !== null) {
+            try {
+              const trHtml = match[1];
+              const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/g;
+              let tdMatch;
+              let tds: string[] = [];
+              while ((tdMatch = tdRegex.exec(trHtml)) !== null) {
+                tds.push(tdMatch[1]);
+              }
+              if (tds.length >= 7) {
+                // rating
+                let rating = "";
+                const ratingSpanMatch = tds[6].match(/<span[^>]*[\s\S]*?>([\s\S]*?)<\/span>/);
+                if (ratingSpanMatch) {
+                  rating = ratingSpanMatch[1].replace(/<[^>]+>/g, "").trim();
+                }
+                if (rating && !isNaN(Number(rating))) {
+                  pMusics.push(Number(rating));
+                }
+              }
+            } catch (e) {}
+          }
+        }
+      } catch (e) {
+        pMusics = [];
+      }
+      if (!Array.isArray(pMusics) || pMusics.length === 0) {
+        setModalError("Pスコア枠の取得に失敗しました。");
+        setModalLoading(false);
+        return;
+      }
+      // pMusics=[1.123, 1.234, 1.345, 1.456, 1.567, 1.678, 1.789, 1.890, 2.001, 2.112, 2.223, 2.334, 2.445, 2.556, 2.667, 2.778, 2.889, 3.000]; // TODO: test
+      // console.log(pMusics);
+      setModalRatings(pMusics);
+      setModalLoading(false);
+    } catch (e) {
+      setModalError("Pスコア枠の取得に失敗しました。");
+      setModalLoading(false);
+    }
+  }
+
+  // モーダル閉じる
+  function handleCloseModal() {
+    setShowOutlierModal(false);
+    setModalRatings([]);
+    setModalError("");
+    setModalLoading(false);
+  }
+
+  // モーダル「絞り込む」
+  function handleModalFilter() {
+  if (modalRatings.length === 0) return;
+  const sortedRatings = [...modalRatings].sort((a, b) => a - b);
+  const min = sortedRatings[0];
+  const max = sortedRatings[barSliderIdx];
+  setShowOutlierModal(false);
+  setOutlierExclude("する");
+  setRatingRange([min, max]);
+  }
+
+  // モーダル表示時スクロール不可
+  useEffect(() => {
+    if (showOutlierModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showOutlierModal]);
+
   return (
     <>
       <Header />
+      {/* 外れ値除外モーダル */}
+      {showOutlierModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(41,50,65,0.25)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={handleCloseModal}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              boxShadow: "0 2px 16px #29324133",
+              padding: "32px 24px 24px 24px",
+              minWidth: 320,
+              maxWidth: 420,
+              width: "90vw",
+              textAlign: "center",
+              position: "relative",
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontWeight: "bold", fontSize: "1.15em", color: "#3d5a80", marginBottom: 18 }}>
+              Pスコア枠外れ値除外
+            </div>
+            <div>
+              <p><span style={{ color: "red" }}>「極端に高い値」を除外</span>することで、より適した選出が可能になる場合があります。</p>
+            </div>
+            {modalLoading ? (
+              <div style={{ textAlign: "center", padding: "32px 0" }}>
+                <span style={{ display: "inline-block", width: 24, height: 24, border: "3px solid #bbb", borderTop: "3px solid #3d5a80", borderRadius: "50%", animation: "spin 0.8s linear infinite", verticalAlign: "middle" }}></span>
+                <span style={{ marginLeft: 12 }}>取得中...</span>
+              </div>
+            ) : modalError ? (
+              <div style={{ color: "#ee6c4d", marginBottom: 16, fontWeight: "bold" }}>{modalError}</div>
+            ) : (
+              <div style={{ marginBottom: 18 }}>
+                {modalRatings.length > 0 ? (
+                  (() => {
+                    const min = Math.min(...modalRatings);
+                    const max = Math.max(...modalRatings);
+                    const barAreaW = 300; // px固定
+                    const barAreaH = 120;
+                    const barGap = 1; // 1px固定
+                    const n = modalRatings.length;
+                    // 棒の幅: (エリア幅 - gap合計) / 本数
+                    const barW = n > 0 ? (barAreaW - barGap * (n - 1)) / n : 0;
+                    const getBarHeight = (val: number) => {
+                      if (max === min) return barAreaH * 0.5;
+                      const ratio = (val - min) / (max - min);
+                      return barAreaH * (0.1 + 0.8 * ratio);
+                    };
+                    // 棒グラフ値（昇順）
+                    const sortedRatings = [...modalRatings].sort((a, b) => a - b);
+                    // 初期値（最大値）
+                    if (barSliderIdx === 0 && sortedRatings.length > 0) {
+                      setBarSliderIdx(sortedRatings.length - 1);
+                    }
+                    return (
+                      <div style={{ width: barAreaW, margin: "0 auto", marginBottom: 8 }}>
+                        <div style={{ textAlign: "center", fontWeight: "bold", color: "#3d5a80", marginBottom: 8, fontSize: "1.05em" }}>
+                          {`${min.toFixed(3)} ～ ${sortedRatings[barSliderIdx]?.toFixed(3)}`}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "flex-end", height: barAreaH, width: barAreaW, borderBottom: "1.5px solid #98c1d9", position: "relative" }}>
+                          {sortedRatings.map((r, idx) => (
+                            <div key={idx} style={{
+                              width: barW,
+                              height: getBarHeight(r),
+                              marginLeft: idx === 0 ? 0 : barGap,
+                              background: idx > barSliderIdx
+                                ? "#ddddddff"
+                                : "linear-gradient(180deg, #3d5a80 0%, #98c1d9 100%)",
+                              borderRadius: "4px 4px 0 0",
+                              position: "relative",
+                              transition: "height 0.2s",
+                            }}>
+                            </div>
+                          ))}
+                        </div>
+                        {/* スライダー */}
+                        <div style={{ marginTop: 18, width: 300, display: "flex", flexDirection: "column", alignItems: "center" }}>
+                          <input
+                            type="range"
+                            min={1}
+                            max={sortedRatings.length - 1}
+                            step={1}
+                            value={barSliderIdx}
+                            onChange={e => setBarSliderIdx(Number(e.target.value))}
+                            style={{ width: 310, accentColor: "#3d5a80" }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div>データがありません</div>
+                )}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 24 }}>
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                style={{
+                  padding: "10px 22px",
+                  fontSize: "1.05rem",
+                  fontWeight: "bold",
+                  color: "#3d5a80",
+                  background: "#e0fbfc",
+                  border: "1.5px solid #98c1d9",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                }}
+              >
+                閉じる
+              </button>
+              <button
+                type="button"
+                onClick={handleModalFilter}
+                disabled={modalLoading || modalRatings.length === 0}
+                style={{
+                  padding: "10px 22px",
+                  fontSize: "1.05rem",
+                  fontWeight: "bold",
+                  color: "#fff",
+                  background: modalLoading || modalRatings.length === 0 ? "#98c1d9" : "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: modalLoading || modalRatings.length === 0 ? "not-allowed" : "pointer",
+                }}
+              >
+                絞り込む
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <main
         style={{
           padding: "64px 1rem 2rem 1rem",
@@ -807,7 +1055,7 @@ export default function Recommend() {
           <div style={{
             display: "flex",
             width: "100%",
-            marginBottom: 18,
+            marginBottom: 8,
             alignItems: "center",
           }}>
             <div style={{
@@ -870,6 +1118,82 @@ export default function Recommend() {
                 inputMode="numeric"
                 autoComplete="off"
               />
+            </div>
+          </div>
+          <div style={{
+            display: "flex",
+            width: "100%",
+            marginBottom: 18,
+            alignItems: "center",
+          }}>
+            <div style={{
+              width: "48%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              paddingRight: 8,
+              justifyContent: "center",
+              height: "100%",
+              textAlign: "right", // 右詰め
+            }}>
+              <label htmlFor="scorelog-id" style={{
+                fontWeight: "bold",
+                color: "#3d5a80",
+                fontSize: "1rem",
+                textAlign: "right",
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                height: "100%",
+                justifyContent: "flex-end", // 右詰め
+              }}>
+              </label>
+            </div>
+            {/* 外れ値を手動で除外ボタン */}
+            <div style={{ 
+              width: "48%",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              paddingLeft: 8,
+              justifyContent: "center",
+              height: "100%",
+            }}>
+              <button
+                type="button"
+                onClick={handleOutlierExclude}
+                style={{
+                  padding: "10px 22px",
+                  fontSize: "0.9rem",
+                  fontWeight: "bold",
+                  color: "#fff",
+                  background: "linear-gradient(90deg, #3d5a80 0%, #98c1d9 100%)",
+                  border: "none",
+                  borderRadius: 100,
+                  boxShadow: "0 2px 8px #98c1d933",
+                  cursor: id ? "pointer" : "not-allowed",
+                  opacity: id ? 1 : 0.5,
+                  marginBottom: 0,
+                }}
+                disabled={!id}
+              >
+                外れ値を手動で除外
+              </button>
+              {/* 絞り込み結果表示 */}
+              {outlierExclude === "する" && ratingRange && (
+                <div style={{
+                  marginTop: 12,
+                  color: "#3d5a80",
+                  fontWeight: "bold",
+                  fontSize: "1.05em",
+                  background: "#e0fbfc",
+                  borderRadius: 8,
+                  padding: "8px 16px",
+                  display: "inline-block",
+                }}>
+                  {`${ratingRange[0].toFixed(3)} ～ ${ratingRange[1].toFixed(3)}`}
+                </div>
+              )}
             </div>
           </div>
           {/* テクチャレ除外 */}
