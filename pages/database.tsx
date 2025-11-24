@@ -949,16 +949,18 @@ export default function Database() {
         <Title>☆獲得人数一覧</Title>
         <section style={{ color: "#293241", fontSize: "1rem", lineHeight: "2", margin: "2.5rem 0" }}>
           各楽曲の☆獲得人数を一覧表で閲覧できます。<br />
-          オンゲキ-NETの全国ランキングページに反映されているデータが対象になります。
+          オンゲキ-NETの全国ランキングページに反映されているデータが対象になります。<br />
+          <span style={{ color: "red" }}>サイト改良中です。機能は通常通り利用できますが、データ更新が数週間ほど停止していますのでご了承ください。
+          </span>
         </section>
         {isSpState ? renderOptionsSP() : renderOptionsPC()}
         {loading && <div style={{ color: "#3d5a80", margin: "1.5em 0" }}>データ取得中...</div>}
         {errorMsg && <div style={{ color: "#ee6c4d", margin: "1.5em 0" }}>{errorMsg}</div>}
         {tableImageUrl && (
           <div style={{ margin: "2em 0", overflowX: "auto" }}>
-            <div style={{ color: "#293241", textAlign: 'center', margin: '0 30px 30px' }}>
+            {/* <div style={{ color: "#293241", textAlign: 'center', margin: '0 30px 30px' }}>
               ※ オンゲキアドベンチャー解禁曲は集計が遅れる場合があります。
-            </div>
+            </div> */}
             <img src={tableImageUrl} alt="一覧表" style={{ maxWidth: "100%" }} />
           </div>
         )}

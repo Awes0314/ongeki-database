@@ -402,7 +402,9 @@ export default function Ranking() {
           <b>テクニカルスコアランキング1位の理論値回数</b>及び
           <b>Pスコア理論値達成人数</b>
           をランキング形式で閲覧できます。<br />
-          オンゲキ-NETの全国ランキングページに反映されているデータが対象になります。
+          オンゲキ-NETの全国ランキングページに反映されているデータが対象になります。<br />
+          <span style={{ color: "red" }}>サイト改良中です。機能は通常通り利用できますが、データ更新が数週間ほど停止していますのでご了承ください。
+          </span>
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           {TAB_LIST.map((t) => (
