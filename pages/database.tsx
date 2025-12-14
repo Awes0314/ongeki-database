@@ -950,7 +950,7 @@ export default function Database() {
         <section style={{ color: "#293241", fontSize: "1rem", lineHeight: "2", margin: "2.5rem 0" }}>
           各楽曲の☆獲得人数を一覧表で閲覧できます。<br />
           オンゲキ-NETの全国ランキングページに反映されているデータが対象になります。<br />
-          <span style={{ color: "red" }}>サイト改良中です。機能は通常通り利用できますが、データ更新が数週間ほど停止していますのでご了承ください。
+          <span style={{ color: "red" }}>サイト改良中です。機能は通常通り利用できますが、データ更新が数週間ほど停止していますのでご了承ください。（12月末安定稼働開始予定）
           </span>
         </section>
         {isSpState ? renderOptionsSP() : renderOptionsPC()}
